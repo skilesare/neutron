@@ -15,3 +15,7 @@ test-results
 tmp/
 .assetgen/
 /wagyu-alpha-*.png
+.playwright/hackathon-profile/
+submission-assets/calendar-demo.mp4
+submission-assets/calendar-video-cover.png
+submission-assets/portal-filled-draft.png
