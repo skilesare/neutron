@@ -50,16 +50,14 @@ if (config.demoUrl) {
   await page.getByLabel("Link URL").last().fill(config.demoUrl);
 }
 
-const fileInputs = page.locator('input[type="file"]');
-const count = await fileInputs.count();
-for (let index = 0; index < count; index += 1) {
-  const input = fileInputs.nth(index);
-  const accept = (await input.getAttribute("accept")) ?? "";
-  const multiple = await input.getAttribute("multiple");
-  if (accept.includes(".neutron")) await input.setInputFiles(absolute(config.package));
-  else if (multiple !== null) await input.setInputFiles(config.screenshots.map(absolute));
-  else if (accept.match(/image/i)) await input.setInputFiles(absolute(config.icon));
-}
+const packageInput = page.locator('input[type="file"][accept*=".neutron"]');
+const screenshotInput = page.locator('input[type="file"][multiple]');
+const iconInput = page.locator('input[type="file"][accept*="image"]:not([multiple])');
+await packageInput.setInputFiles(absolute(config.package));
+await iconInput.setInputFiles(absolute(config.icon));
+// The portal removes the screenshot input after all six slots are occupied, so
+// upload these last instead of retaining an index across reactive re-renders.
+await screenshotInput.setInputFiles(config.screenshots.map(absolute));
 
 for (const [name, field, expected] of [
   ["Project", project, config.title],
