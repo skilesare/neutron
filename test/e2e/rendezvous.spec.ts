@@ -601,6 +601,8 @@ test("Alice and Bob privately negotiate and confirm a meeting", async ({ browser
     await tray.getByRole("button", { name: "Review requests" }).click();
     await expect(bob.page.locator('iframe[data-tid="app-tray-frame"][data-app-id="rendezvous"]')).toHaveCount(0);
     await submissionScreenshot(bob.page, "02-bob-received.jpg");
+    const acceptedMeetingDate = new Date(await bobNegotiation.locator(".received-options label span").first().innerText());
+    expect(Number.isNaN(acceptedMeetingDate.getTime())).toBe(false);
     await bobNegotiation.getByRole("radio").first().check();
     await bobNegotiation.getByRole("button", { name: "Accept selected time" }).click();
     await expect(bobNegotiation.getByText("Scheduled", { exact: true })).toBeVisible({ timeout: 60_000 });
@@ -617,22 +619,18 @@ test("Alice and Bob privately negotiate and confirm a meeting", async ({ browser
     await closeApp(bob.page, "Rendezvous");
     const aliceConfirmed = await openApp(alice.page, "calendar");
     const bobConfirmed = await openApp(bob.page, "calendar");
-    await expect(aliceConfirmed.getByText(meeting)).toBeVisible();
-    await expect(bobConfirmed.getByText(meeting)).toBeVisible();
+    await expect(aliceConfirmed.getByText(meeting).first()).toBeVisible();
+    await expect(bobConfirmed.getByText(meeting).first()).toBeVisible();
     const alicePrivateDate = new Date(Date.now() + privateDay * 86_400_000); alicePrivateDate.setHours(15, 0, 0, 0);
     const bobPrivateDate = new Date(Date.now() + (privateDay + 21) * 86_400_000); bobPrivateDate.setHours(15, 0, 0, 0);
     await showCalendarMonth(aliceConfirmed, alicePrivateDate);
     await expect(aliceConfirmed.locator(".fc-event-title").filter({ hasText: alicePrivate })).toBeVisible();
     await showCalendarMonth(bobConfirmed, bobPrivateDate);
     await expect(bobConfirmed.locator(".fc-event-title").filter({ hasText: bobPrivate })).toBeVisible();
-    await aliceConfirmed.getByRole("button", { name: "Today" }).click();
-    await aliceConfirmed.getByRole("button", { name: "Week", exact: true }).click();
-    await aliceConfirmed.locator(".fc-next-button").click();
+    await showCalendarWeek(aliceConfirmed, acceptedMeetingDate);
     await expect(aliceConfirmed.locator(".fc-event-title").filter({ hasText: meeting })).toBeVisible({ timeout: 60_000 });
     await submissionScreenshot(alice.page, "03-alice-confirmed-calendar.jpg");
-    await bobConfirmed.getByRole("button", { name: "Today" }).click();
-    await bobConfirmed.getByRole("button", { name: "Week", exact: true }).click();
-    await bobConfirmed.locator(".fc-next-button").click();
+    await showCalendarWeek(bobConfirmed, acceptedMeetingDate);
     await expect(bobConfirmed.locator(".fc-event-title").filter({ hasText: meeting })).toBeVisible({ timeout: 60_000 });
     await submissionScreenshot(bob.page, "04-bob-confirmed-calendar.jpg");
     await aliceConfirmed.locator(".fc-event-title").filter({ hasText: meeting }).click();
@@ -694,8 +692,10 @@ test("Alice and Bob privately negotiate and confirm a meeting", async ({ browser
     await bobMedia.getByRole("button", { name: "Start camera & microphone" }).click();
     await expect(media.getByText("Direct browser connection", { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(bobMedia.getByText("Direct browser connection", { exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(media.getByText("Connected directly — media stays between browsers", { exact: true })).toBeVisible();
     await expect(media.locator("#remote")).toBeVisible();
     await expect(bobMedia.locator("#remote")).toBeVisible();
+    await submissionScreenshot(alice.page, "07-direct-video.jpg");
 
     await overlay.locator('[data-tid="media-session-end"]').click();
     await bobOverlay.locator('[data-tid="media-session-end"]').click();
@@ -1017,6 +1017,20 @@ async function showCalendarMonth(calendar: FrameLocator, target: Date) {
   for (let month = 0; month < Math.abs(monthOffset); month += 1) {
     await calendar.locator(direction).click();
   }
+}
+
+async function showCalendarWeek(calendar: FrameLocator, target: Date) {
+  await calendar.getByRole("button", { name: "Week", exact: true }).click();
+  await calendar.getByRole("button", { name: "Today" }).click();
+  const startOfWeek = (date: Date) => {
+    const result = new Date(date);
+    result.setHours(0, 0, 0, 0);
+    result.setDate(result.getDate() - result.getDay());
+    return result;
+  };
+  const weekOffset = Math.round((startOfWeek(target).getTime() - startOfWeek(new Date()).getTime()) / (7 * 86_400_000));
+  const direction = weekOffset < 0 ? ".fc-prev-button" : ".fc-next-button";
+  for (let week = 0; week < Math.abs(weekOffset); week += 1) await calendar.locator(direction).click();
 }
 
 async function dragBetween(page: Page, source: Locator, target: Locator) {

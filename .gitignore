@@ -1,6 +1,10 @@
 .dfx
 .mops
 node_modules
+.playwright/hackathon-profile/
+submission-assets/portal-filled-draft.png
+submission-assets/rendezvous-demo.mp4
+submission-assets/rendezvous-video-cover.png
 dist
 build
 .neutron

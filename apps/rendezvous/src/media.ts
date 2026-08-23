@@ -42,6 +42,7 @@ function configurePeer(): RTCPeerConnection {
   peer.ontrack = ({ streams }) => { remoteVideo.srcObject = streams[0] ?? new MediaStream(); remoteVideo.hidden = false; remoteEmpty.hidden = true; };
   peer.onconnectionstatechange = () => {
     connection.textContent = peer.connectionState === "connected" ? "Direct browser connection" : peer.connectionState;
+    if (peer.connectionState === "connected") status.value = "Connected directly — media stays between browsers";
     if (peer.connectionState === "failed") status.value = "The direct connection failed. TURN relay is not configured.";
   };
   peer.onicecandidate = ({ candidate }) => { if (candidate) void send("candidate", candidate.toJSON()).catch(showError); };

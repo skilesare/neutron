@@ -1,66 +1,68 @@
 # Rendezvous submission runbook
 
-This is the release checklist for the Neutron Hackathon entry. The app submitted to the portal is **Rendezvous**; Contacts and Calendar are its required installed dependencies and should be included in the repository, demo fleet, and reproduction instructions.
+Rendezvous is the Neutron hackathon entry. Contacts and Calendar are required
+app dependencies. The direct-media preview also requires the attached custom
+Kernel 0.3.13; obtain organizer approval before presenting that Kernel as an
+ordinary installable app submission.
 
 ## Submission copy
 
 **Title:** Rendezvous
 
-**Summary:** Rendezvous finds a meeting time across two independently owned Neutron canisters without a scheduling server or shared calendar database. Each person's Calendar filters candidates locally; only bounded proposal state crosses a paid, caller-bound public-ingress route. Durable intents, exact retries, revision checks, local holds, and final Calendar revalidation make replay, lost replies, and mid-flight conflicts safe.
-
 **Short pitch:** Private peer-to-peer scheduling for sovereign personal clouds.
 
-**Package:** `apps/rendezvous/rendezvous.v0.2.1.neutron`
+**Summary:** Each person's Calendar filters availability locally; only selected
+candidate times cross a paid, caller-bound Neutron route. Contacts supplies
+locally trusted peer names, holds and revision checks prevent double-booking,
+and an experimental Kernel-brokered WebRTC surface connects confirmed
+participants directly in the browser.
 
-**Required companion packages:** `apps/contacts/contacts.v0.3.1.neutron`, then `apps/calendar/calendar.v0.2.0.neutron`
+**Source:** https://github.com/skilesare/neutron/tree/rendezvous-hackathon
 
-**Icon:** `apps/rendezvous/public/static/icon.png`
+**Demo video after release:**
+https://github.com/skilesare/neutron/releases/download/rendezvous-v0.3.0/rendezvous-demo.mp4
 
-Suggested links:
+The machine-readable portal values are in `submission/hackathon-entry.json`.
 
-1. Public source repository and tagged submission commit.
-2. Demo video.
-3. `DEMO.md` or a rendered architecture/threat-model page.
+## Exact candidate artifacts
 
-## Portal requirements to recheck before upload
+Install in this order on an isolated review Neutron:
 
-The official [Neutron Hackathon](https://4576f-3aaaa-aaaam-ajgpq-cai.icp0.io/)
-portal's current client bundle was audited on 2026-08-21. It requires a
-`.neutron` package plus title, summary, icon, screenshots, and links; a Hacker
-role; a reward wallet; and own-work/download consent.
+1. `apps/kernel/kernel.v0.3.13.neutron` — custom Kernel replacement
+2. `apps/contacts/contacts.v0.3.1.neutron`
+3. `apps/calendar/calendar.v0.2.0.neutron`
+4. `apps/rendezvous/rendezvous.v0.3.0.neutron`
 
-Current upload limits, still subject to a final live-form check before upload:
-
-- one package per app, at most 1.9 MB;
-- icon at most 100 KB;
-- up to six screenshots, each at most 400 KB;
-- up to six links.
-
-Each qualifier permits one submission per hacker. Entries and later versions are moderator-reviewed. The final hour of an open round freezes app-content revisions, so submit early enough for moderation. Use the live countdown in the portal as the authoritative deadline; do not copy a projected date into this repository.
-
-The release artifacts fit those limits individually:
-
-- Rendezvous package: 808,243 bytes;
-- required Calendar package: 734,302 bytes;
-- required Contacts package: 253,319 bytes;
-- icon: 80,955 bytes.
-
-## Architecture
-
-```mermaid
-flowchart LR
-  CTA[Contacts A\nlocal labels/bindings] -->|bounded lookup +\nrevision check| RA
-  CA[Calendar A\nprivate events] <-->|internal app calls| RA[Rendezvous A]
-  RA -->|paid, bounded\nrendezvous_v1 ingress| RB[Rendezvous B]
-  RB <-->|internal app calls| CB[Calendar B\nprivate events]
-  RA -. exact retry uses\nsame command ID .-> RB
+```text
+fd62a090014de2636c8b9774aa327f7cc95f20d4f1922c1d30990cb5082b1488  apps/kernel/kernel.v0.3.13.neutron
+19591c8db038db92c182b70ce0761e855efc1e7e7f37d3b1503866baa11d097a  apps/contacts/contacts.v0.3.1.neutron
+8e95eb974ed2025b94a4be21611ee79d5aa5c44a7ba394b7c46fd4db08db15c1  apps/calendar/calendar.v0.2.0.neutron
+85a6893c2bed02c20ff45a8c15560a5a9c3432967a6cc6d0f8e8504a7c78840f  apps/rendezvous/rendezvous.v0.3.0.neutron
+1cdf152366cae15536b8d9b5f6a2967c107ca88ce37ca685af5f1ce2b9f7baaa  submission-assets/rendezvous-demo.mp4
 ```
 
-There is no Rendezvous service canister, shared account system, or shared calendar database. Each app runs inside its owner's Neutron canister. Contact names, notes, existing event titles, event notes, and busy intervals never enter the peer protocol.
+Rendezvous is 933,992 bytes. The 78,757-byte icon and all six selected
+screenshots fit the portal limits audited on 2026-08-23: one package up to
+1.9 MB, one icon up to 100 KB, and up to six screenshots at 400 KB each.
+The custom Kernel archive is 2,035,320 bytes and is therefore a release/review
+artifact, not the portal's Rendezvous package upload.
 
-## Clean release verification
+## What the demo proves
 
-Run from the repository root in the pinned development environment. Prerequisites are Node/npm, Bun, and Mops; the official [getting-started guide](https://www.ntron.net/docs/develop/getting-started) recommends `nix develop` for the pinned tools.
+- Alice chooses exact proposal times; the app does not randomly schedule.
+- Bob sees Alice's locally trusted Contacts name and exact Neutron principal.
+- Each Calendar privately revalidates availability and both owners explicitly
+  confirm the selected time.
+- Holds, revisions, durable commands, and exact retries protect against stale
+  state, conflicts, uncertain delivery, and duplicate execution.
+- Confirmed participants can approve a nonce-origin media iframe and connect
+  browser-to-browser. Calendar data and contact labels do not enter signaling.
+- There is no Rendezvous service canister, shared account system, or shared
+  calendar database.
+
+## Verification
+
+From the repository root:
 
 ```sh
 npm install
@@ -70,115 +72,71 @@ MOTOKO_TEST=public_ingress_service_test.mo,backend_calls_test.mo npm --workspace
 npm run test:e2e:rendezvous:fresh
 npm run test:e2e:calendar-upgrade:fresh
 npm run test:e2e:submission-install:fresh
+npm run submission:rendezvous:screenshots
+npm run submission:rendezvous:video
+npm run submission:rendezvous:release
+npm run submission:rendezvous:portal -- --check
 ```
 
-The fresh browser command destructively reinstalls the configured local Alice/Bob fleet, then runs smoke, happy-path, conflict-safety, and diagnostic-privacy coverage through local Internet Identity.
+The release command is a dry run by default. Publishing additionally requires
+`--publish`, the exact `RENDEZVOUS_RELEASE_CONFIRM` value printed by the dry
+run, and explicit owner authorization.
 
-Last verified on 2026-08-21: the complete Rendezvous workspace suite passes,
-including 17 frontend/package tests plus memory and Motoko protocol tests. The
-exact final archives passed all 15 product scenarios in the destructive fresh
-two-Neutron browser suite in 2.5 minutes; only the opt-in diagnostic case was
-skipped. Coverage includes native drag/resize persistence and visible two-tab
-stale-drag rollback. A separate kernel-only fixture reviewed and installed
-Contacts 0.3.1, Calendar 0.2.0, and Rendezvous 0.2.1 in dependency order in
-58.4 seconds and verified runtime versions 301/200/201.
+The portal command's `--check` mode is headless and non-mutating. Without that
+flag it opens a persistent headed Playwright browser, waits while the owner
+completes Internet Identity/Profile setup, fills the draft, uploads assets, and
+leaves the final **Submit app** click to the owner.
 
-Expected release artifacts and current SHA-256 values:
+## Demo assets
 
-```text
-19591c8db038db92c182b70ce0761e855efc1e7e7f37d3b1503866baa11d097a  apps/contacts/contacts.v0.3.1.neutron
-9fce191e78effbe62588154e511faf2d9768dd50d40e04fd4787825941df5242  apps/calendar/calendar.v0.2.0.neutron
-9058aa9a9132f3f8a55cc00b68d874c22413ddfa8de3bff8e5957582be86392c  apps/rendezvous/rendezvous.v0.2.1.neutron
-```
-
-Recompute after any source or package rebuild:
-
-```sh
-shasum -a 256 apps/contacts/contacts.v0.3.1.neutron apps/calendar/calendar.v0.2.0.neutron apps/rendezvous/rendezvous.v0.2.1.neutron
-```
-
-## Demo assets to capture
-
-Capture real product screens from a fresh two-node run; do not use a mockup as proof of execution.
-
-Capture the six verified states from an automatically cleaned fleet:
+The six portal screenshots configured in `submission/hackathon-entry.json`
+show the sent proposal, verified sender identity, both confirmed Calendars,
+meeting detail, and direct video connection. Regenerate them from a freshly
+installed Alice/Bob fleet with:
 
 ```sh
 npm run submission:rendezvous:screenshots
 ```
 
-This writes size-controlled JPEGs to `submission-assets/`.
+The 60-second Remotion project lives in `submission-video/` and renders to
+`submission-assets/rendezvous-demo.mp4`. It uses real product screenshots and
+is captioned so it works without audio.
 
-1. Alice's sent proposal with delivered transport evidence.
-2. Bob's received proposal with each option revalidated locally.
-3. Alice's Calendar after confirmation.
-4. Bob's Calendar after confirmation at the same time.
-5. The confirmed meeting's read-only Calendar detail view.
-6. The matching confirmed negotiation highlighted after cross-app navigation.
+## Release and portal sequence
 
-Crop or resize every final image below 400 KB and verify no local paths, private principals beyond the intentional demo identities, passkey dialogs, or diagnostic data are visible. Use the two-minute narration in `DEMO.md` for the video.
+1. Get an explicit organizer answer on whether the custom Kernel/media preview
+   is eligible. If not, submit the stock-Kernel-compatible v0.2.1 scheduling
+   app and describe direct media as future work.
+2. Review `git diff`, commit, and push `rendezvous-hackathon`.
+3. Create the GitHub release with the four archives and demo MP4.
+4. Run `npm run submission:rendezvous:portal`, complete Internet Identity,
+   Hacker role, wallet, and consent, then return to the terminal.
+5. Review every auto-filled field and uploaded asset in the browser. Click
+   **Submit app** manually.
+6. Confirm moderation approval before the portal's final-hour content freeze.
 
-## Portal submission procedure
+## Compatibility and limitations
 
-1. Open the official hackathon site and sign in with Internet Identity.
-2. In Profile, enable Hacker, accept the participation agreement and own-work/download consent, and set the intended reward wallet.
-3. Open **Profile → Entries** during an open qualifier.
-4. Add the title, summary, icon, screenshots, and public links.
-5. Upload `apps/rendezvous/rendezvous.v0.2.1.neutron` as the app package.
-6. Submit for review and confirm the entry becomes approved before the live round's final-hour freeze.
-7. From a separate clean Neutron, download/install through the reviewed browser flow. Install Contacts first, Calendar second, and Rendezvous last; confirm the displayed capability requests match this document.
-8. Preserve the submitted commit, package hashes, screenshots, video URL, and portal entry URL in the release notes or Git tag.
+Rendezvous 0.3.0 declares the experimental `media_sessions` capability, so it
+does not install on upstream Kernel 0.3.12. Kernel 0.3.13 is a deliberate core
+change implementing owner-approved, revocable, ephemeral media authority; it
+is not a forked network or a centralized meeting server.
 
-## Judge-facing proof points
-
-- Two owners, two canisters, no central backend.
-- Calendar remains the private scheduling authority; Rendezvous receives only filtered candidate results.
-- Remote mutation uses Neutron's declared public ingress and the initiator pays the fixed cycle floor.
-- Invite capability and exact caller binding establish the peer relationship; cycles are not identity.
-- Exact command receipts make retries idempotent, while timeout is shown as uncertain rather than false success.
-- Calendar holds and final revalidation prevent double-booking when local state changes mid-flight.
-- Malformed/oversized payloads, replay/reorder, wrong caller/capability, underfunding, revocation, and privacy diagnostics have automated evidence.
-
-## Known limitations
-
-Version 0.2.1 uses Contacts as its primary peer picker. Rendezvous searches only
-bounded Contact metadata and immediately revalidates the exact Contact ID,
-contact revision, book revision, and Neutron principal before creating an
-offer; stale/rebound Contacts fail closed. Contact names and notes never enter
-the peer protocol. A reusable `RVC1` sharing address remains the fallback and
-contains only the Neutron principal; it is deliberately distinct from the
-private random capability generated for each negotiation.
-Rendezvous v1 represents an ordered set of equal candidate times; the current
-counter flow proposes one exact alternative, so preference ranking and
-multi-option counters require a future protocol revision. Calendar supports
-bounded local recurrence but does not yet sync external calendars or send email
-notifications. Browser meetings use a reviewed Kernel-brokered, revocable
-nonce-origin surface; ordinary app tiles remain denied camera and microphone.
-The current WebRTC experiment has no STUN/TURN or relay fallback, so claim only
-direct connectivity where host candidates are mutually reachable. There is no
-human-identity claim. Neutron itself is
-preproduction; describe this as a hackathon demonstration, not a production
-scheduling service.
-
-Upgrade safety is exercised against the released predecessor, not only a
-memory-unit fixture: `npm run test:e2e:calendar-upgrade:fresh` installs Calendar
-v0.1.0 on a dedicated local Neutron, creates an event through the old tile,
-reviews and applies v0.2.0 through Neutron's package-update UI, and verifies the
-event remains present with memory schema 2.
-
-The clean owner-install fixture, `npm run test:e2e:submission-install:fresh`,
-starts with a kernel-only Neutron and drives the reviewed browser File flow for
-Contacts, Calendar, then Rendezvous. It waits for every browser compile and
-checked upgrade, opens all three apps, and verifies versions 301/200/201.
+The current WebRTC path has no STUN/TURN relay and is only claimed to connect
+when host ICE candidates are mutually reachable. This is a hackathon preview,
+not a production conferencing service. Calendar supports bounded local
+recurrence but does not sync external calendars or send email notifications.
 
 ## Final human checklist
 
-- [x] All automated commands above pass on the final submission candidate.
-- [x] Recomputed release hashes match the recorded files.
-- [ ] Repository/tag is public and its license/NOTICE files are present.
-- [x] Six real 0.2.1 screenshots use the Contacts-first primary flow and are
-  under 80 KB each (`submission-assets/`).
-- [ ] Demo video link works without authentication.
-- [ ] Hacker role, consent, and reward wallet are configured.
-- [ ] Portal entry is submitted and moderator-approved before the freeze.
-- [x] Clean reviewed browser File install works: Contacts, Calendar, Rendezvous.
+- [x] Public source branch exists.
+- [x] Final Rendezvous package is under the portal limit.
+- [x] LLM-generated product icon is under 100 KB.
+- [x] Six current real-product screenshots are under 400 KB each.
+- [x] 60-second demo video renders from repository sources.
+- [x] Release and portal automation have non-mutating check modes.
+- [ ] Organizer approves the custom Kernel/media capability for judging.
+- [ ] Final changes are reviewed, committed, and pushed.
+- [ ] GitHub release and public demo-video link exist.
+- [ ] Hacker role, reward wallet, and consent are configured.
+- [ ] Portal entry is manually reviewed, submitted, and moderator-approved.

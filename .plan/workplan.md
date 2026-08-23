@@ -1,8 +1,8 @@
 # Rendezvous — LLM implementation workplan
 
-Status: active product reset (2026-08-21)  
-Target: Neutron format-3 apps, Calendar 0.2.0 (manifest 200) and Rendezvous 0.2.1 (manifest 201)  
-Deliverables: contacts.v0.3.1.neutron dependency, calendar.v0.2.0.neutron, and rendezvous.v0.2.1.neutron  
+Status: submission candidate automation and human review (2026-08-21)
+Target: Neutron format-3 apps, custom Kernel 0.3.13, Calendar 0.2.0, and Rendezvous 0.3.0
+Deliverables: Kernel 0.3.13 preview, Contacts 0.3.1, Calendar 0.2.0, Rendezvous 0.3.0, screenshots, demo video, release automation, and assisted portal upload
 Upstream platform: https://github.com/infu/neutron
 
 ## 0. Product reset: from protocol demo to useful calendar
@@ -1231,3 +1231,28 @@ Append dated entries for upstream SHA and decisions that alter frozen v1 contrac
   (`1 passed`, 29.8 seconds). The installed 860,138-byte Rendezvous 0.3.0 archive
   is `0a44ea53936f6de57ce48b6a482b25d3ababf6639762896e7c1d51d645bc2720`.
 - 2026-08-20: packaged Kernel 0.3.12, Calendar 0.1.0, and Rendezvous 0.1.0; compiled and installed the complete actor on a two-node PocketIC fleet. Verified Alice `mqrdp-r7777-77775-qaaaq-cai` and Bob `mzsit-hx777-77775-qaaba-cai` healthy at the local gateway. Contacts, agent tools, resident tray, full hostile-wire corpus, and automated browser happy/adversarial flows remain explicitly deferred.
+- 2026-08-21: completed the submission-asset pass. Replaced the generic robot
+  artwork with a 192×192 LLM-generated Rendezvous icon (two calendars meeting
+  through a protected peer-to-peer orbit), regenerated seven real-product
+  screenshots, and selected six portal images including verified sender identity
+  and the live direct-browser connection. The final package is 933,992 bytes
+  with SHA-256 `85a6893c2bed02c20ff45a8c15560a5a9c3432967a6cc6d0f8e8504a7c78840f`.
+- 2026-08-21: added a standalone, reproducible 60-second Remotion demo under
+  `submission-video/`, GitHub release dry-run/publish tooling, and a headed
+  Playwright portal assistant with a non-mutating `--check` mode. Portal login,
+  Profile/Hacker setup, final visual review, and the Submit click remain
+  explicitly human-owned. Release publishing also remains confirmation-gated.
+
+## Submission closeout TODOs
+
+- [x] Build the exact Rendezvous 0.3.0 portal package below 1.9 MB.
+- [x] Generate and visually inspect a distinctive icon below 100 KB.
+- [x] Capture six current product screenshots below 400 KB each.
+- [x] Build a source-controlled Remotion demo from the real screenshots.
+- [x] Add dry-run GitHub release validation and confirmation-gated publishing.
+- [x] Add Playwright-assisted portal upload without automating final submission.
+- [ ] Obtain organizer approval for the custom Kernel 0.3.13 media capability.
+- [ ] Review, stage, commit, and push the final candidate with owner approval.
+- [ ] Publish `rendezvous-v0.3.0` and confirm the public MP4 URL.
+- [ ] Complete Internet Identity/Profile setup and run the portal assistant.
+- [ ] Manually review, submit, and confirm moderator approval before freeze.
