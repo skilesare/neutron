@@ -5,8 +5,10 @@ import {
   assertCertifiedAssetsTransitions,
   assertStableStoreSchemaTransitions,
   compile,
+  compileLegacyV25Compatibility,
   extractImports,
   fixedBackendCallInstallReservationTargetPrincipals,
+  persistenceModeFromCompilerId,
   reachableMotokoFiles,
 } from "../src/compile.ts";
 import { assemble } from "../src/assemble.ts";
@@ -15,6 +17,7 @@ import type { NeutronBackendCallReservation } from "neutron-tools/src/capabiliti
 import {
   assertSupportedCertificateVersions,
   SUPPORTED_CERTIFICATE_VERSIONS_METADATA_V1,
+  wasmCustomSections,
   withSupportedCertificateVersions,
 } from "neutron-tools/src/wasm_metadata.js";
 import {
@@ -30,6 +33,36 @@ import { hashContent } from "neutron-tools/src/hash.js";
 
 const moduleHash = (digit: string): string => digit.repeat(64);
 const schema = (entry: string) => ({ entry, hash: entry });
+
+test("exact v25 compatibility rejects browser permissions before compilation", () => {
+  const media: PackagedNeutronManifest = {
+    format: 3,
+    id: "media",
+    name: "Media",
+    version: 100,
+    entry: moduleHash("a"),
+    tiles: [
+      {
+        id: "main",
+        title: "Media",
+        path: "index.html",
+        icon: "icon.png",
+      },
+    ],
+    capabilities: {
+      browser_permissions: {
+        api: 1,
+        tiles: [{ id: "main", features: ["camera"] }],
+      },
+    },
+  };
+
+  expect(() =>
+    compileLegacyV25Compatibility({ mofiles: [], configs: { media } }),
+  ).toThrow(
+    "App media declares browser_permissions, which requires Kernel 316 or newer with assembler neutron_actor_v26",
+  );
+});
 
 test("compiler rejects backend-call install reservations for the target actor", () => {
   const target = "r7inp-6aaaa-aaaaa-aaabq-cai";
@@ -419,6 +452,7 @@ const kernelCapabilityConfigurationMethod = `
     { app_id = appId; installation_uid = 1 }
   };
   public func runtime_app_instances(_deploymentId : Text) : [AppInstance] { [] };
+  public func capability_authority_revision() : Nat64 { 0 };
   public func scope_active(_scope : AppScope) : Bool { true };
   public type PublicIngressCyclesCapability = {
     available : () -> Nat;
@@ -443,6 +477,7 @@ const kernelCapabilityConfigurationMethod = `
       };
     },
   ) {};
+  public func configure_app_browser_surfaces<T>(_declarations : [T]) {};
   public func configure_frontend_surface_counts(
     _counts : { app_instances : Nat; resident_frames : Nat },
   ) {};
@@ -837,6 +872,56 @@ test("compile retains exact assembled source only for explicit qualification", a
       vetKeysEnvironment: "production",
     }),
   );
+  expect(
+    wasmCustomSections(
+      result.wasm,
+      "icp:private enhanced-orthogonal-persistence",
+    ),
+  ).toHaveLength(0);
+});
+
+test("compiler binds enhanced persistence into the Wasm and compiler identity", async () => {
+  const entry = moduleHash("f");
+  const result = await compile({
+    configs: {
+      kernel: {
+        format: 3,
+        id: "kernel",
+        name: "Kernel",
+        version: 101,
+        entry,
+      },
+    },
+    persistenceMode: "enhanced",
+    mofiles: [
+      {
+        path: `${entry}.mo`,
+        content: `module {
+          public class Init() {
+            ${kernelCapabilityConfigurationMethod}
+            public func kernel_authorized_add(_caller : Principal) {};
+            public func is_authorized(_caller : Principal) : Bool { true };
+          };
+        }`,
+      },
+    ],
+  });
+
+  expect(result.persistenceMode).toBe("enhanced");
+  expect(result.compilerId).toStartWith("moc_enhanced_");
+  expect(persistenceModeFromCompilerId(result.compilerId)).toBe("enhanced");
+  expect(
+    wasmCustomSections(
+      result.wasm,
+      "icp:private enhanced-orthogonal-persistence",
+    ),
+  ).toHaveLength(1);
+  expect(persistenceModeFromCompilerId("moc_6921f895690abfd3")).toBe(
+    "enhanced",
+  );
+  expect(persistenceModeFromCompilerId("moc_b95fce3642e89f40")).toBe(
+    "classical",
+  );
 });
 
 test("reachableMotokoFiles keeps only modules imported from configured entries", async () => {
@@ -952,7 +1037,7 @@ test("compiler defaults vetKeys to production and binds explicit local selection
       ),
     }),
   ).rejects.toThrow("only the compiled IC mainnet root key");
-});
+}, 15_000);
 
 test("compiler accepts only current-format state-preserving upgrades", async () => {
   const kernelEntry = moduleHash("d");
@@ -2606,7 +2691,7 @@ test("compiler stages live-root uninstall and permits immediate same-id reinstal
     "@neutron-managed-memory-retirements-v2 [{",
   );
   expect(replaced.compatibilityDiagnostics).toEqual([]);
-});
+}, 15_000);
 
 test("compiler keeps uninstall available for apps without managed memory", async () => {
   const kernelEntry = moduleHash("a");

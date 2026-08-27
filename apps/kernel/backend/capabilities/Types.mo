@@ -47,7 +47,6 @@ module {
         #connections;
         #persistent_browser_storage;
         #dedicated_resident_origin;
-        #media_sessions;
         #http_routes;
         #certified_read_routes;
         #certified_assets;

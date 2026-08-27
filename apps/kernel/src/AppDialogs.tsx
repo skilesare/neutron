@@ -23,7 +23,11 @@ import {
 import {
   BACKEND_CALL_PERSISTENCE_DISCLOSURE,
   BACKEND_RESERVATION_SCOPE_DISCLOSURES,
+  BROWSER_PERMISSION_FEATURE_DISCLOSURES,
+  BROWSER_PERMISSION_PERSISTENCE_DISCLOSURE,
   DEDICATED_RESIDENT_ORIGIN_DISCLOSURE,
+  browserPermissionFeaturesTitle,
+  browserPermissionRequestDisclosure,
   certifiedAssetsCollectionDisclosure,
   functionResourceLabel,
   permissionKey,
@@ -1038,14 +1042,6 @@ function formatPermissionByteLimit(value: number): string {
   return `${formatBytes(value)} (${formatExactNat(value)} bytes)`;
 }
 
-function formatPermissionDuration(seconds: number): string {
-  if (seconds % 3_600 === 0) {
-    const hours = seconds / 3_600;
-    return `${hours} ${hours === 1 ? "hour" : "hours"}`;
-  }
-  return `${Math.ceil(seconds / 60)} minutes`;
-}
-
 export function PermissionDisclosure({
   permission,
 }: {
@@ -1084,28 +1080,34 @@ export function PermissionDisclosure({
           </p>
         </PermissionFrame>
       );
-    case "media_sessions": {
-      const devices =
-        permission.features.length === 2
-          ? "Camera and microphone"
-          : permission.features[0] === "camera"
-            ? "Camera"
-            : "Microphone";
+    case "browser_permissions": {
+      const browserPermissionTitle = browserPermissionFeaturesTitle(
+        permission.tiles.flatMap(({ features }) => features),
+      );
       return (
         <PermissionFrame kind={permission.kind} level={level}>
           <h4 className="permission-group-title">
-            {devices} during an explicit call
+            Browser {browserPermissionTitle.toLowerCase()} access
           </h4>
           <p className="permission-copy">
-            The app may ask Neutron to open one visible, isolated call surface.
-            Each call requires your action, a Neutron confirmation, and the
-            browser device prompt.
+            Installing this app does not activate a camera or microphone. Its
+            declared open tiles may request only the access listed below.
           </p>
+          <ul className="permission-inventory">
+            {permission.tiles.flatMap(({ id, features }) =>
+              features.map((feature) => (
+                <li key={`${id}:${feature}`}>
+                  <strong>
+                    {BROWSER_PERMISSION_FEATURE_DISCLOSURES[feature].title}
+                  </strong>
+                  <span>{browserPermissionRequestDisclosure(id, feature)}</span>
+                </li>
+              )),
+            )}
+          </ul>
           <p className="permission-copy permission-persistence">
-            Each session is limited to {formatPermissionDuration(permission.maxDurationSeconds)}.
-            Ordinary app tiles and backgrounds never receive device access.
+            {BROWSER_PERMISSION_PERSISTENCE_DISCLOSURE}
           </p>
-          <code>{permission.entrypoint}</code>
         </PermissionFrame>
       );
     }

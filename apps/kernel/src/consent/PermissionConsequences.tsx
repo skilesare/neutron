@@ -1,5 +1,10 @@
 import type { Permission, PermissionLevel } from "../lib/perm.ts";
-import { permissionLevel } from "../lib/perm.ts";
+import {
+  BROWSER_PERMISSION_PERSISTENCE_DISCLOSURE,
+  browserPermissionFeaturesTitle,
+  browserPermissionRequestDisclosure,
+  permissionLevel,
+} from "../lib/perm.ts";
 import { formatBytes, formatCycles } from "../settings/format.ts";
 
 export type PermissionConsequence = Readonly<{
@@ -66,7 +71,7 @@ export function permissionConsequences(
   const consequences = [
     systemConsequences(permissions),
     delegatedConsequences(permissions),
-    mediaConsequences(permissions),
+    browserDeviceConsequences(permissions),
     networkConsequences(permissions),
     publicConsequences(permissions),
     automaticConsequences(permissions),
@@ -79,26 +84,30 @@ export function permissionConsequences(
   );
 }
 
-function mediaConsequences(
+function browserDeviceConsequences(
   permissions: readonly Permission[],
 ): PermissionConsequence | null {
-  const media = firstPermission(permissions, "media_sessions");
-  if (!media) return null;
-  const deviceLabel =
-    media.features.length === 2
-      ? "camera and microphone"
-      : media.features[0] === "camera"
-        ? "camera"
-        : "microphone";
+  const browserPermissions = firstPermission(
+    permissions,
+    "browser_permissions",
+  );
+  if (!browserPermissions) return null;
+  const browserPermissionTitle = browserPermissionFeaturesTitle(
+    browserPermissions.tiles.flatMap(({ features }) => features),
+  );
   return {
-    id: "call-media",
-    level: permissionLevel(media),
-    title: `Use your ${deviceLabel} during calls`,
+    id: "browser-device-access",
+    level: permissionLevel(browserPermissions),
+    title: `Request ${browserPermissionTitle.toLowerCase()} access`,
     description:
-      "Installation declares the maximum call access. Every session still requires an explicit owner action, a Neutron confirmation, and the browser device prompt.",
+      "Declared open tiles can ask the browser for device access. Installing the app does not activate a device.",
     facts: [
-      `Can open one visible, isolated media surface for at most ${formatInterval(media.maxDurationSeconds)}. Closing it, signing out, disabling or updating the app, or expiry revokes the session.`,
-      "Ordinary app tiles and background frames remain unable to use camera or microphone.",
+      ...browserPermissions.tiles.flatMap(({ id, features }) =>
+        features.map((feature) =>
+          browserPermissionRequestDisclosure(id, feature),
+        ),
+      ),
+      BROWSER_PERMISSION_PERSISTENCE_DISCLOSURE,
     ],
   };
 }

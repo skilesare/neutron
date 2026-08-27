@@ -26,8 +26,6 @@ import {
   onTileViewRequest,
   offerAppInstall,
   openAppTile,
-  openMediaSession,
-  closeMediaSession,
   publishAppStateChange,
   removeExposedTool,
   toError,
@@ -920,6 +918,37 @@ test("message-channel handshake moves requests onto the kernel port", async () =
   channel.port2.close();
 });
 
+test("SPA route changes preserve the authenticated Kernel parent", async () => {
+  const fakeWindow = installFakeWindow(undefined, false);
+  fakeWindow.location.href =
+    `https://ahelloa--${fakeCanisterId}.icp0.io/settings`;
+  const channel = new MessageChannel();
+  channel.port2.addEventListener("message", (event) => {
+    channel.port2.postMessage({
+      type: "response",
+      id: event.data.id,
+      ok: "kernel-after-route-change",
+    });
+  });
+  channel.port2.start();
+
+  fakeWindow.dispatch(
+    {
+      type: "neutron:msgbus:connect",
+      version: 1,
+      sessionId: "routechange123456",
+    },
+    fakeWindow.parent,
+    fakeKernelOrigin,
+    [channel.port1],
+  );
+
+  await expect(exec("routed_action", {}, 0.2)).resolves.toBe(
+    "kernel-after-route-change",
+  );
+  channel.port2.close();
+});
+
 test("app calls wait for the private kernel port", async () => {
   const fakeWindow = installFakeWindow(undefined, false);
   const channel = new MessageChannel();
@@ -1326,49 +1355,6 @@ test("clipboard helper uses the private endpoint-bound action", async () => {
   });
   fakeWindow.dispatch({ type: "response", id: request.id, ok: null });
   await expect(pending).resolves.toBeUndefined();
-});
-
-test("media session helpers use private endpoint-bound actions", async () => {
-  const fakeWindow = installFakeWindow();
-  const opening = openMediaSession({
-    features: ["camera", "microphone"],
-    purpose: "Join the planning call",
-    durationSeconds: 1800,
-  }, 0.2);
-  const request = fakeWindow.parent.messages[0]?.message as {
-    id: number;
-    payload: { action: string; payload: unknown };
-  };
-  expect(request.payload).toEqual({
-    action: "media_sessions.open",
-    payload: {
-      features: ["camera", "microphone"],
-      purpose: "Join the planning call",
-      durationSeconds: 1800,
-    },
-  });
-  fakeWindow.dispatch({
-    type: "response",
-    id: request.id,
-    ok: { sessionId: "session", expiresAt: "100", features: ["camera"] },
-  });
-  await expect(opening).resolves.toEqual({
-    sessionId: "session",
-    expiresAt: "100",
-    features: ["camera"],
-  });
-
-  const closing = closeMediaSession("session", 0.2);
-  const close = fakeWindow.parent.messages[1]?.message as {
-    id: number;
-    payload: { action: string; payload: unknown };
-  };
-  expect(close.payload).toEqual({
-    action: "media_sessions.close",
-    payload: { sessionId: "session" },
-  });
-  fakeWindow.dispatch({ type: "response", id: close.id, ok: null });
-  await expect(closing).resolves.toBeUndefined();
 });
 
 test("tray helpers use bounded private endpoint actions", async () => {

@@ -222,12 +222,6 @@ function kitchenSinkManifest(): NeutronManifest {
         ],
       },
       persistent_browser_storage: { api: 1, surface: "background" },
-      media_sessions: {
-        api: 1,
-        entrypoint: "call/media.html",
-        features: ["microphone", "camera"],
-        max_duration_seconds: 7_200,
-      },
       public_ingress: {
         api: 1,
         routes: [
@@ -298,6 +292,13 @@ function kitchenSinkManifest(): NeutronManifest {
             mount: "shares",
             kind: "publication",
           },
+        ],
+      },
+      browser_permissions: {
+        api: 1,
+        tiles: [
+          { id: "secondary", features: ["microphone"] },
+          { id: "main", features: ["microphone", "camera"] },
         ],
       },
     },
@@ -471,6 +472,12 @@ test("catalogue is closed, complete, versioned, and owns presentation policy", (
       CAPABILITY_CATALOG[definition.declaration].delivery,
     ).toContain("backend_environment");
   }
+  expect(CAPABILITY_CATALOG.browser_permissions.summary).toContain(
+    "capture may continue while an open tile's workspace is hidden",
+  );
+  expect(CAPABILITY_CATALOG.browser_permissions.summary).not.toContain(
+    "visible tiles",
+  );
 });
 
 test("buildCapabilityPlan produces one exact declared and derived inventory", () => {
@@ -494,12 +501,6 @@ test("buildCapabilityPlan produces one exact declared and derived inventory", ()
   });
   expect(getCapabilityPlanEntry(plan, "randomness")?.config).toEqual({
     api: 1,
-  });
-  expect(getCapabilityPlanEntry(plan, "media_sessions")?.config).toEqual({
-    api: 1,
-    entrypoint: "call/media.html",
-    features: ["camera", "microphone"],
-    max_duration_seconds: 7_200,
   });
   expect(getCapabilityPlanEntry(plan, "chain_key_signing")?.config).toEqual({
     api: 1,
@@ -628,6 +629,13 @@ test("buildCapabilityPlan produces one exact declared and derived inventory", ()
         exact_path: "/current",
         max_object_bytes: 65_536,
       },
+    ],
+  });
+  expect(getCapabilityPlanEntry(plan, "browser_permissions")?.config).toEqual({
+    api: 1,
+    tiles: [
+      { id: "main", features: ["camera", "microphone"] },
+      { id: "secondary", features: ["microphone"] },
     ],
   });
   expect(
@@ -883,53 +891,6 @@ test("resident frame security is explicit and dedicated modes are exclusive", ()
   ).config.frame_security = "persistent_dedicated_v1";
   expect(() => parseCapabilityPlanWireV1(forged)).toThrow(
     /inconsistent with resident capabilities/,
-  );
-});
-
-test("media sessions are closed, bounded, path-safe, canonical, and wire-stable", () => {
-  const base: NeutronManifest = {
-    format: 3,
-    id: "media_test",
-    name: "Media Test",
-    version: 100,
-    tiles: [{ id: "main", title: "Main", path: "index.html" }],
-    capabilities: {
-      media_sessions: {
-        api: 1,
-        entrypoint: "call/media.html",
-        features: ["microphone", "camera"],
-        max_duration_seconds: 7_200,
-      },
-    },
-  };
-  const wire = toCapabilityPlanWireV1(buildCapabilityPlan(base));
-  expect(getCapabilityPlanEntry(wire, "media_sessions")?.config).toEqual({
-    api: 1,
-    entrypoint: "call/media.html",
-    features: ["camera", "microphone"],
-    max_duration_seconds: 7_200,
-  });
-  expect(parseCapabilityPlanWireV1(wire)).toEqual(wire);
-
-  for (const entrypoint of ["", "/media.html", "../media.html", "a//media.html", "a\\media.html"]) {
-    const invalid = structuredClone(base);
-    invalid.capabilities!.media_sessions!.entrypoint = entrypoint;
-    expect(() => buildCapabilityPlan(invalid)).toThrow(/media_sessions entrypoint/);
-  }
-  for (const duration of [299, 14_401, 7_200.5]) {
-    const invalid = structuredClone(base);
-    invalid.capabilities!.media_sessions!.max_duration_seconds = duration;
-    expect(() => buildCapabilityPlan(invalid)).toThrow(/max_duration_seconds/);
-  }
-  for (const features of [[], ["camera", "camera"], ["geolocation"]]) {
-    const invalid = structuredClone(base) as any;
-    invalid.capabilities.media_sessions.features = features;
-    expect(() => buildCapabilityPlan(invalid)).toThrow(/media_sessions feature/);
-  }
-  const unknown = structuredClone(base) as any;
-  unknown.capabilities.media_sessions.persist = true;
-  expect(() => buildCapabilityPlan(unknown)).toThrow(
-    /Unknown media_sessions capability field persist/,
   );
 });
 
@@ -1810,6 +1771,9 @@ test("wire serialization and fingerprint are deterministic for normalized sets",
   right.capabilities!.public_ingress!.routes.reverse();
   right.capabilities!.http_routes!.mounts.reverse();
   right.capabilities!.certified_assets!.collections.reverse();
+  right.capabilities!.browser_permissions!.tiles.reverse();
+  right.capabilities!.browser_permissions!.tiles[0]!.features.reverse();
+  right.capabilities!.browser_permissions!.tiles[1]!.features.reverse();
   right.tiles!.reverse();
   right.backend!.capabilities = {
     backend_calls: { api: 1 },
@@ -2079,6 +2043,24 @@ test("plan wire parser closes every boundary and rejects old wire formats", () =
         (entry) => entry.id !== "certified_read_routes",
       ),
     },
+    {
+      ...wire,
+      entries: wire.entries.map((entry) =>
+        entry.id === "browser_permissions"
+          ? {
+              ...entry,
+              config: {
+                api: 1,
+                tiles: [{ id: "missing", features: ["camera"] }],
+              },
+            }
+          : entry,
+      ),
+    },
+    {
+      ...wire,
+      entries: wire.entries.filter((entry) => entry.id !== "tile_endpoints"),
+    },
   ]) {
     expect(() => parseCapabilityPlanWireV1(candidate)).toThrow();
   }
@@ -2189,4 +2171,109 @@ test("capability plan diffs are exact, complete, and canonical", () => {
       app: { ...target.app, id: "other_app" },
     }),
   ).toThrow("different apps");
+});
+
+test("browser permission changes are exact structural plan diffs", () => {
+  const manifest = (
+    version: number,
+    features?: Array<"camera" | "microphone">,
+  ): NeutronManifest => ({
+    format: 3,
+    id: "browser_diff",
+    name: "Browser Diff",
+    version,
+    tiles: [{ id: "call", title: "Call" }],
+    ...(features
+      ? {
+          capabilities: {
+            browser_permissions: {
+              api: 1,
+              tiles: [{ id: "call", features }],
+            },
+          },
+        }
+      : {}),
+  });
+  const absent = toCapabilityPlanWireV1(buildCapabilityPlan(manifest(100)));
+  const camera = toCapabilityPlanWireV1(
+    buildCapabilityPlan(manifest(101, ["camera"])),
+  );
+  const both = toCapabilityPlanWireV1(
+    buildCapabilityPlan(manifest(102, ["microphone", "camera"])),
+  );
+
+  expect(diffCapabilityPlans(absent, camera).entries).toMatchObject([
+    { change: "added", id: "browser_permissions", before: null },
+  ]);
+  expect(diffCapabilityPlans(camera, both).entries).toMatchObject([
+    {
+      change: "changed",
+      id: "browser_permissions",
+      before: { config: { tiles: [{ features: ["camera"] }] } },
+      after: {
+        config: { tiles: [{ features: ["camera", "microphone"] }] },
+      },
+    },
+  ]);
+  expect(diffCapabilityPlans(both, camera).entries).toMatchObject([
+    {
+      change: "changed",
+      id: "browser_permissions",
+      before: {
+        config: { tiles: [{ features: ["camera", "microphone"] }] },
+      },
+      after: { config: { tiles: [{ features: ["camera"] }] } },
+    },
+  ]);
+  expect(diffCapabilityPlans(both, absent).entries).toMatchObject([
+    { change: "removed", id: "browser_permissions", after: null },
+  ]);
+  expect(new Set([
+    fingerprintCapabilityPlanWireV1(absent),
+    fingerprintCapabilityPlanWireV1(camera),
+    fingerprintCapabilityPlanWireV1(both),
+  ])).toHaveLength(3);
+
+  const twoTiles = manifest(103, ["camera"]);
+  twoTiles.tiles!.push({ id: "other", title: "Other" });
+  twoTiles.capabilities!.browser_permissions!.tiles.push({
+    id: "other",
+    features: ["microphone"],
+  });
+  const removedTile = structuredClone(twoTiles);
+  removedTile.version = 104;
+  removedTile.tiles = removedTile.tiles!.filter(({ id }) => id !== "other");
+  removedTile.capabilities!.browser_permissions!.tiles =
+    removedTile.capabilities!.browser_permissions!.tiles.filter(
+      ({ id }) => id !== "other",
+    );
+  expect(
+    diffCapabilityPlans(
+      toCapabilityPlanWireV1(buildCapabilityPlan(twoTiles)),
+      toCapabilityPlanWireV1(buildCapabilityPlan(removedTile)),
+    ).entries.map(({ id }) => id),
+  ).toEqual(["browser_permissions", "tile_endpoints"]);
+  const danglingTile = structuredClone(twoTiles);
+  danglingTile.tiles = danglingTile.tiles!.filter(({ id }) => id !== "other");
+  expect(() => buildCapabilityPlan(danglingTile)).toThrow(
+    "browser_permissions references undeclared tile other",
+  );
+});
+
+test("adding an optional capability id preserves legacy wire bytes", () => {
+  const wire = toCapabilityPlanWireV1(
+    buildCapabilityPlan({
+      format: 3,
+      id: "plain_app",
+      name: "Plain App",
+      version: 100,
+      tiles: [{ id: "main", title: "Main" }],
+    }),
+  );
+  expect(serializeCapabilityPlanWireV1(wire)).toBe(
+    '{"app":{"id":"plain_app","version":100},"entries":[{"api":1,"config":{"endpoints":[{"id":"main","path":"index.html"}]},"id":"tile_endpoints","provenance":"derived"}],"format":1}',
+  );
+  expect(fingerprintCapabilityPlanWireV1(wire)).toBe(
+    "fadcdb953c2d9054f646b4c46b4b2c772d90e60fc3277faa4505b4c4ad5c3883",
+  );
 });

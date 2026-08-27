@@ -7,6 +7,7 @@ import {
   type NeutronAgentEntrypointsCapabilityConfig,
   type NeutronBackendCallsCapabilityConfig,
   type NeutronBackgroundUiRequestsCapabilityConfig,
+  type NeutronBrowserPermissionsCapabilityConfig,
   type NeutronChainKeySigningCapabilityConfig,
   type NeutronEthereumProviderCapabilityConfig,
   type NeutronHttpRoutesCapabilityConfig,
@@ -14,7 +15,6 @@ import {
   type NeutronCertifiedAssetsCapabilityConfig,
   type NeutronCertifiedReadRoutesCapabilityConfig,
   type NeutronDedicatedResidentOriginCapabilityConfig,
-  type NeutronMediaSessionsCapabilityConfig,
   type NeutronPersistentBrowserStorageCapabilityConfig,
   type NeutronPublicIngressCapabilityConfig,
   type NeutronRandomnessCapabilityConfig,
@@ -67,10 +67,13 @@ export type DeclaredCapabilityPlanEntry =
       "dedicated_resident_origin",
       NeutronDedicatedResidentOriginCapabilityConfig
     >
-  | DeclaredEntry<"media_sessions", NeutronMediaSessionsCapabilityConfig>
   | DeclaredEntry<"public_ingress", NeutronPublicIngressCapabilityConfig>
   | DeclaredEntry<"http_routes", NeutronHttpRoutesCapabilityConfig>
-  | DeclaredEntry<"certified_assets", NeutronCertifiedAssetsCapabilityConfig>;
+  | DeclaredEntry<"certified_assets", NeutronCertifiedAssetsCapabilityConfig>
+  | DeclaredEntry<
+      "browser_permissions",
+      NeutronBrowserPermissionsCapabilityConfig
+    >;
 
 type DeclaredEntry<Id extends CapabilityId, Config> = {
   id: Id;
@@ -468,9 +471,6 @@ export function buildCapabilityPlan(manifest: NeutronManifest): CapabilityPlan {
       ),
     );
   }
-  if (capabilities.media_sessions) {
-    entries.push(declaredEntry("media_sessions", capabilities.media_sessions));
-  }
   if (capabilities.public_ingress) {
     entries.push(declaredEntry("public_ingress", capabilities.public_ingress));
   }
@@ -480,6 +480,11 @@ export function buildCapabilityPlan(manifest: NeutronManifest): CapabilityPlan {
   if (capabilities.certified_assets) {
     entries.push(
       declaredEntry("certified_assets", capabilities.certified_assets),
+    );
+  }
+  if (capabilities.browser_permissions) {
+    entries.push(
+      declaredEntry("browser_permissions", capabilities.browser_permissions),
     );
   }
 
