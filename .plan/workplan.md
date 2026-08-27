@@ -1259,7 +1259,7 @@ Append dated entries for upstream SHA and decisions that alter frozen v1 contrac
   the 60-second MP4 is
   `19ad9b022484985e7d6be110c3d2814855068c6ae020c6c2b83574c35ab63199`.
 
-- [x] Build the exact Rendezvous 0.3.0 portal package below 1.9 MB.
+- [x] Build the exact Rendezvous 0.3.1 portal package below 1.9 MB.
 - [x] Generate and visually inspect a distinctive icon below 100 KB.
 - [x] Capture six current product screenshots below 400 KB each.
 - [x] Build a source-controlled Remotion demo from the real screenshots.
@@ -1267,7 +1267,7 @@ Append dated entries for upstream SHA and decisions that alter frozen v1 contrac
 - [x] Add Playwright-assisted portal upload without automating final submission.
 - [x] Replace the custom Kernel media fork with upstream Kernel 0.3.17's
   tile-scoped browser capability.
-- [ ] Review, stage, commit, and push the final candidate with owner approval.
-- [ ] Publish `rendezvous-v0.3.1` and confirm the public MP4 URL.
+- [x] Review, stage, commit, and push the final candidate with owner approval.
+- [x] Publish `rendezvous-v0.3.1` and confirm the public MP4 URL.
 - [ ] Complete Internet Identity/Profile setup and run the portal assistant.
 - [ ] Manually review, submit, and confirm moderator approval before freeze.
