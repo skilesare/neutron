@@ -1,8 +1,8 @@
 # Rendezvous — LLM implementation workplan
 
 Status: submission candidate automation and human review (2026-08-21)
-Target: Neutron format-3 apps, custom Kernel 0.3.13, Calendar 0.2.0, and Rendezvous 0.3.0
-Deliverables: Kernel 0.3.13 preview, Contacts 0.3.1, Calendar 0.2.0, Rendezvous 0.3.0, screenshots, demo video, release automation, and assisted portal upload
+Target: Neutron format-3 apps, upstream Kernel 0.3.17, Calendar 0.2.0, and Rendezvous 0.3.1
+Deliverables: upstream Kernel 0.3.17, Contacts 0.3.1, Calendar 0.2.0, Rendezvous 0.3.1, screenshots, demo video, release automation, and assisted portal resubmission
 Upstream platform: https://github.com/infu/neutron
 
 ## 0. Product reset: from protocol demo to useful calendar
@@ -1245,14 +1245,29 @@ Append dated entries for upstream SHA and decisions that alter frozen v1 contrac
 
 ## Submission closeout TODOs
 
+- 2026-08-27: upstream merged the capability series now released as Kernel
+  0.3.17, with an owner-designed API-1
+  `browser_permissions` capability. The abandoned custom Kernel 0.3.13 media
+  broker is removed. Rendezvous 0.3.1 declares camera and microphone only for
+  its isolated `main` tile, starts devices only after a visible user click, and
+  renders its WebRTC meeting panel in that tile. Persistent Rendezvous memory
+  remains schema v2 with the immutable v1-to-v2 lineage. The full workspace
+  Rendezvous package suite, representative same-root restoration check, and
+  installed-browser flow pass; screenshot and video assets are regenerated
+  from the installed flow. Final Rendezvous is 835,451 bytes with SHA-256
+  `52e663f56daba68fb7a38a3be11186acde0516dd82c97b52c0352ec7c535816f`;
+  the 60-second MP4 is
+  `19ad9b022484985e7d6be110c3d2814855068c6ae020c6c2b83574c35ab63199`.
+
 - [x] Build the exact Rendezvous 0.3.0 portal package below 1.9 MB.
 - [x] Generate and visually inspect a distinctive icon below 100 KB.
 - [x] Capture six current product screenshots below 400 KB each.
 - [x] Build a source-controlled Remotion demo from the real screenshots.
 - [x] Add dry-run GitHub release validation and confirmation-gated publishing.
 - [x] Add Playwright-assisted portal upload without automating final submission.
-- [ ] Obtain organizer approval for the custom Kernel 0.3.13 media capability.
+- [x] Replace the custom Kernel media fork with upstream Kernel 0.3.17's
+  tile-scoped browser capability.
 - [ ] Review, stage, commit, and push the final candidate with owner approval.
-- [ ] Publish `rendezvous-v0.3.0` and confirm the public MP4 URL.
+- [ ] Publish `rendezvous-v0.3.1` and confirm the public MP4 URL.
 - [ ] Complete Internet Identity/Profile setup and run the portal assistant.
 - [ ] Manually review, submit, and confirm moderator approval before freeze.

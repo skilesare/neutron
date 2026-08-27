@@ -34,6 +34,7 @@ type CompileCall = Readonly<{
   appId: string;
   deploymentNonce: string;
   vetKeysEnvironment: "local" | "production";
+  persistenceMode: "classical" | "enhanced";
 }>;
 
 function deferred<T>(): Deferred<T> {
@@ -65,7 +66,7 @@ let preparedRecordBytes = new Uint8Array([1]);
 let operationPhases: string[] = [];
 let deploymentRecord: CompleteDeploymentBuildRecord;
 let runtimeDeploymentId = BASELINE_DEPLOYMENT_ID;
-let runtimeCompilerId = "neutron-compiler/test";
+let runtimeCompilerId = "moc_classical_test";
 
 mock.module("icblast", () => ({
   default: () => async () => ({}),
@@ -82,6 +83,7 @@ mock.module("icblast", () => ({
 }));
 
 mock.module("neutron-compiler/src/install.js", () => ({
+  BROWSER_SURFACE_ORIGINS_PATH: "/system/browser-surface-origins.json",
   appDependencyImpact: () => ({ direct: [], transitive: [] }),
   assertPreparedPackageArchiveIdentity: () => undefined,
   assertPreparedPackageBatch: () => undefined,
@@ -112,6 +114,7 @@ mock.module("neutron-compiler/src/install.js", () => ({
     return deployGate.promise;
   },
   normalizeAppRegistry: (registry: unknown) => registry,
+  parseBrowserSurfaceOriginsSidecar: () => [],
   planAppRegistryDependencies: () => ({}),
   preparePackageInstall: () => {
     throw new Error("Unexpected package preparation");
@@ -256,6 +259,8 @@ function createCompilerState(): KernelPackageState {
   return Object.freeze({
     registry: apps,
     apps,
+    browserSurfaceOriginAppIds: Object.freeze(["mail"]),
+    browserSurfaceOriginsSidecarPresent: true,
     existingConfigs: Object.freeze({
       kernel: { name: "Neutron" },
       mail: { name: "Mail from authenticated baseline" },
@@ -380,7 +385,7 @@ beforeEach(() => {
   provenanceValue = BASELINE_PROVENANCE;
   preparedRecordBytes = new Uint8Array([1]);
   runtimeDeploymentId = BASELINE_DEPLOYMENT_ID;
-  runtimeCompilerId = "neutron-compiler/test";
+  runtimeCompilerId = "moc_classical_test";
   useAppsStore.setState({
     list: {
       kernel: baselineKernel,
@@ -414,6 +419,7 @@ test("uninstall compilation completes before the final confirmation is exposed",
     appId: "mail",
     deploymentNonce: DEPLOYMENT_NONCE,
     vetKeysEnvironment: "local",
+    persistenceMode: "classical",
   });
   expect(baselineAssertions).toBe(1);
   expect(useAppsStore.getState()).toMatchObject({
@@ -548,7 +554,7 @@ test("connection-provider compiler input drift is rejected before staging", asyn
 
 test("same-deployment compiler identity drift is rejected before staging", async () => {
   const { result } = await startReviewedUninstall();
-  runtimeCompilerId = "neutron-compiler/changed";
+  runtimeCompilerId = "moc_classical_changed";
 
   resolveAppUninstall(true);
 
@@ -675,6 +681,9 @@ test("approval is the only boundary that deploys the reviewed uninstall artifact
   });
   expect(deployCalls[0]?.compiled).toBe(compiled);
   expect(deployCalls[0]?.deploymentBuildRecord).toBe(deploymentRecord);
+  expect(deployCalls[0]?.existingBrowserSurfaceOriginAppIds).toBe(
+    compilerState.browserSurfaceOriginAppIds,
+  );
   expect(operationPhases).toContain("staging");
   expect(deployCalls[0]?.stagedAssets).toHaveLength(1);
   const provenanceAsset = deployCalls[0]?.stagedAssets?.[0];

@@ -147,7 +147,7 @@ export const RendezvousVideo: React.FC = () => (
     <Sequence from={360} durationInFrames={240}><SplitScene duration={240} eyebrow="Compose locally" title={<>Choose the people.<br />Choose the times.</>} copy="Rendezvous searches your Contacts and Calendar without exposing either one to the peer." image="01-alice-proposal.jpg" /></Sequence>
     <Sequence from={600} durationInFrames={240}><SplitScene duration={240} eyebrow="Authenticated delivery" title="Know exactly who invited you." copy="The recipient sees their own trusted Contact name plus the authenticated peer Neutron principal." image="02-bob-received.jpg" flip /></Sequence>
     <Sequence from={840} durationInFrames={270}><CalendarsScene duration={270} /></Sequence>
-    <Sequence from={1110} durationInFrames={270}><SplitScene duration={270} eyebrow="Direct browser media" title="Turn the meeting into a call." copy="The Kernel grants camera and microphone only to a revocable one-time origin. Media flows browser to browser." image="07-direct-video.jpg" /></Sequence>
+    <Sequence from={1110} durationInFrames={270}><SplitScene duration={270} eyebrow="Direct browser media" title="Turn the meeting into a call." copy="Neutron grants camera and microphone only to Rendezvous's declared app tile. Media flows browser to browser." image="07-direct-video.jpg" /></Sequence>
     <Sequence from={1380} durationInFrames={420}><ClosingScene duration={420} /></Sequence>
   </AbsoluteFill>
 );

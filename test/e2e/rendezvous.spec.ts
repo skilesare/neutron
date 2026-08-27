@@ -84,9 +84,8 @@ test("Calendar and Rendezvous restore together after a workspace reload", async 
     await expect(restoredCalendar.getByText(title)).toBeVisible({ timeout: 60_000 });
     await expect(restoredRendezvous.getByLabel("Their Rendezvous address")).toHaveValue("");
 
-    // Ordinary application tiles must remain unable to acquire ambient media.
-    // A future video feature requires the reviewed, explicit media surface in
-    // workplan P5; silently broadening this iframe would be a security defect.
+    // Browser authority is tile-specific. Calendar declares no browser media
+    // capability, while Rendezvous declares camera + microphone for main only.
     const mediaPolicy = await restoredCalendar.locator("body").evaluate(() => {
       const policyDocument = document as Document & {
         permissionsPolicy?: { allowsFeature: (feature: string) => boolean };
@@ -102,6 +101,10 @@ test("Calendar and Rendezvous restore together after a workspace reload", async 
     const calendarFrameAllow =
       (await session.page.locator('[data-app-id="calendar"][data-tile-id="main"]').last().getAttribute("allow")) ?? "";
     expect(calendarFrameAllow).not.toMatch(/camera|microphone/);
+    const rendezvousFrameAllow =
+      (await session.page.locator('[data-app-id="rendezvous"][data-tile-id="main"]').last().getAttribute("allow")) ?? "";
+    expect(rendezvousFrameAllow).toMatch(/camera/);
+    expect(rendezvousFrameAllow).toMatch(/microphone/);
     await assertBasicAccessibility(restoredCalendar);
     await assertBasicAccessibility(restoredRendezvous);
   } finally {
@@ -641,67 +644,41 @@ test("Alice and Bob privately negotiate and confirm a meeting", async ({ browser
     await aliceConfirmed.getByRole("button", { name: "Open meeting in Rendezvous" }).click();
     const reopenedRendezvous = alice.page.frameLocator('[data-app-id="rendezvous"][data-tile-id="main"]').last();
     await expect(reopenedRendezvous.getByRole("status").filter({ hasText: "Meeting opened from Calendar" })).toBeVisible({ timeout: 60_000 });
-    await expect(reopenedRendezvous.locator("article.negotiation--focused").filter({ hasText: meeting })).toBeVisible();
+    const aliceMeeting = reopenedRendezvous.locator("article.negotiation--focused").filter({ hasText: meeting });
+    await expect(aliceMeeting).toBeVisible();
     await submissionScreenshot(alice.page, "06-alice-meeting-negotiation.jpg");
 
-    const ordinaryTile = alice.page.locator('iframe[data-app-id="rendezvous"][data-tile-id="main"]').last();
-    await expect(ordinaryTile).not.toHaveAttribute("allow", /camera|microphone/);
-    await reopenedRendezvous.getByRole("button", { name: "Join video meeting" }).click();
-    const consent = alice.page.locator('[data-tid="media-session-consent"]');
-    await expect(consent).toBeVisible();
-    await expect(consent).toContainText(`Join “${meeting}” with browser-to-browser audio and video`);
-    await expect(consent).toContainText("camera + microphone");
-    await expect(consent).toContainText("1 hour");
-    await consent.locator('[data-tid="media-session-approve"]').click();
-
-    const overlay = alice.page.locator('[data-tid="media-session-overlay"]');
-    await expect(overlay).toBeVisible({ timeout: 60_000 });
-    const kernelPolicy = await alice.page.evaluate(async () =>
-      (await fetch("/", { cache: "no-store" })).headers.get("permissions-policy"),
-    );
-    expect(kernelPolicy).toBe("camera=*, geolocation=(), microphone=*");
-    const mediaElement = overlay.locator('iframe[title="Rendezvous media session"]');
-    const mediaSrc = await mediaElement.getAttribute("src");
-    expect(mediaSrc).toBeTruthy();
-    const mediaUrl = new URL(mediaSrc!);
-    await expect(mediaElement).toHaveAttribute("allow", `camera ${mediaUrl.origin}; microphone ${mediaUrl.origin}`);
-    await expect(mediaElement).toHaveAttribute("sandbox", /allow-scripts/);
-    await expect(mediaElement).toHaveAttribute("sandbox", /allow-same-origin/);
-    await expect(mediaElement).toHaveAttribute("credentialless", "true");
-    const ordinaryUrl = new URL((await ordinaryTile.getAttribute("src"))!);
-    expect(mediaUrl.origin).not.toBe(ordinaryUrl.origin);
-    expect(mediaUrl.hostname).toMatch(/^m[0-9a-f]{24}--/);
-
-    const media = alice.page.frameLocator('iframe[title="Rendezvous media session"]');
-    await expect(media.getByRole("button", { name: "Start camera & microphone" })).toBeVisible();
+    const rendezvousTile = alice.page.locator('iframe[data-app-id="rendezvous"][data-tile-id="main"]').last();
+    const rendezvousAllow = (await rendezvousTile.getAttribute("allow")) ?? "";
+    const rendezvousOrigin = new URL((await rendezvousTile.getAttribute("src"))!).origin;
+    expect(rendezvousAllow).toContain(`camera ${rendezvousOrigin}`);
+    expect(rendezvousAllow).toContain(`microphone ${rendezvousOrigin}`);
+    await aliceMeeting.getByRole("button", { name: "Join video meeting" }).click();
+    await expect(reopenedRendezvous.getByRole("dialog", { name: meeting })).toBeVisible();
+    await expect(reopenedRendezvous.getByRole("button", { name: "Start camera & microphone" })).toBeVisible();
 
     await bobConfirmed.locator(".fc-event-title").filter({ hasText: meeting }).click();
     await expect(bobConfirmed.getByText("Scheduled through Rendezvous")).toBeVisible();
     await bobConfirmed.getByRole("button", { name: "Open meeting in Rendezvous" }).click();
     const bobMeeting = bob.page.frameLocator('[data-app-id="rendezvous"][data-tile-id="main"]').last();
-    await expect(bobMeeting.locator("article.negotiation--focused").filter({ hasText: meeting })).toBeVisible({ timeout: 60_000 });
-    await bobMeeting.getByRole("button", { name: "Join video meeting" }).click();
-    const bobConsent = bob.page.locator('[data-tid="media-session-consent"]');
-    await expect(bobConsent).toContainText(`Join “${meeting}” with browser-to-browser audio and video`);
-    await bobConsent.locator('[data-tid="media-session-approve"]').click();
-    const bobOverlay = bob.page.locator('[data-tid="media-session-overlay"]');
-    await expect(bobOverlay).toBeVisible({ timeout: 60_000 });
-    const bobMedia = bob.page.frameLocator('iframe[title="Rendezvous media session"]');
+    const bobMeetingCard = bobMeeting.locator("article.negotiation--focused").filter({ hasText: meeting });
+    await expect(bobMeetingCard).toBeVisible({ timeout: 60_000 });
+    await bobMeetingCard.getByRole("button", { name: "Join video meeting" }).click();
+    await expect(bobMeeting.getByRole("dialog", { name: meeting })).toBeVisible();
 
-    await media.getByRole("button", { name: "Start camera & microphone" }).click();
-    await bobMedia.getByRole("button", { name: "Start camera & microphone" }).click();
-    await expect(media.getByText("Direct browser connection", { exact: true })).toBeVisible({ timeout: 60_000 });
-    await expect(bobMedia.getByText("Direct browser connection", { exact: true })).toBeVisible({ timeout: 60_000 });
-    await expect(media.getByText("Connected directly — media stays between browsers", { exact: true })).toBeVisible();
-    await expect(media.locator("#remote")).toBeVisible();
-    await expect(bobMedia.locator("#remote")).toBeVisible();
+    await reopenedRendezvous.getByRole("button", { name: "Start camera & microphone" }).click();
+    await bobMeeting.getByRole("button", { name: "Start camera & microphone" }).click();
+    await expect(reopenedRendezvous.getByText("Direct browser connection", { exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(bobMeeting.getByText("Direct browser connection", { exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(reopenedRendezvous.getByText("Connected directly — media stays between browsers", { exact: true })).toBeVisible();
+    await expect(reopenedRendezvous.getByLabel("Remote participant")).toBeVisible();
+    await expect(bobMeeting.getByLabel("Remote participant")).toBeVisible();
     await submissionScreenshot(alice.page, "07-direct-video.jpg");
 
-    await overlay.locator('[data-tid="media-session-end"]').click();
-    await bobOverlay.locator('[data-tid="media-session-end"]').click();
-    await expect(overlay).toHaveCount(0);
-    await expect(bobOverlay).toHaveCount(0);
-    await expect(alice.page.locator('iframe[title="Rendezvous media session"]')).toHaveCount(0);
+    await reopenedRendezvous.getByRole("button", { name: "Leave meeting" }).click();
+    await bobMeeting.getByRole("button", { name: "Leave meeting" }).click();
+    await expect(reopenedRendezvous.getByRole("dialog", { name: meeting })).toHaveCount(0);
+    await expect(bobMeeting.getByRole("dialog", { name: meeting })).toHaveCount(0);
     expect(diagnostic.containsAny([alicePrivate, bobPrivate])).toBe(false);
   } finally {
     if (alicePrincipal) await revoke(aliceRuntime, alicePrincipal);

@@ -50,10 +50,12 @@ view.
 
 ## Browser meeting experiment
 
-A confirmed pair can explicitly open a Kernel-owned media surface. The Kernel
-asks for consent, leases a one-time nonce origin, and delegates camera and
-microphone only to that exact iframe. Rendezvous then exchanges bounded SDP and
-trickle-ICE messages through the two owners' Neutrons. Signal IDs are
+Rendezvous declares Neutron's API-1 `browser_permissions` capability for
+camera and microphone on its `main` tile. The Kernel discloses that declaration
+during install and delegates those browser features only to the exact isolated
+tile origin. Devices remain off until a confirmed participant clicks **Start
+camera & microphone** inside the visible meeting panel. Rendezvous then
+exchanges bounded SDP and trickle-ICE messages through the two owners' Neutrons. Signal IDs are
 deduplicated, queues are bounded, records expire after ten minutes, and an
 explicit Leave physically removes that meeting's queued signals and receipts.
 

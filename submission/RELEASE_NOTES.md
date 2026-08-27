@@ -1,26 +1,31 @@
-# Rendezvous 0.3.0 — Neutron hackathon candidate
+# Rendezvous 0.3.1 — Neutron hackathon candidate
 
-Rendezvous privately negotiates meeting times between two independently owned
+Rendezvous privately negotiates meeting times between independently owned
 Neutron canisters. Calendar availability is filtered locally; selected options,
 bounded protocol state, and WebRTC signaling are the only peer payloads.
 
 ## Install order
 
-1. Kernel 0.3.13 (custom media-capability preview)
+1. Upstream Kernel 0.3.17
 2. Contacts 0.3.1
 3. Calendar 0.2.0
-4. Rendezvous 0.3.0
+4. Rendezvous 0.3.1
 
-## Compatibility notice
+## What changed since 0.3.0
 
-Rendezvous 0.3.0 declares the experimental `media_sessions` capability. It
-requires the Kernel 0.3.13 archive attached to this release and does not install
-on the upstream 0.3.12 Kernel. The Kernel archive is a deliberate manual Kernel
-replacement, not an ordinary app package. Use an isolated Neutron for review.
+Rendezvous now uses upstream Kernel 0.3.17's API-1 `browser_permissions`
+capability. Camera and microphone are delegated only to the exact isolated
+Rendezvous `main` tile; the old custom Kernel media-session API and separate
+nonce-origin iframe are gone. Devices remain off until the participant clicks
+**Start camera & microphone** in the visible meeting panel.
 
-The current direct WebRTC path has no STUN or TURN service. It works when host
-ICE candidates are mutually reachable; it is not claimed as a general NAT
-traversal solution.
+Rendezvous retains memory schema v2 and its complete v1-to-v2 lineage, so this
+code/frontend release does not manufacture a schema migration or reset app
+state.
 
-See `DEMO.md`, `SUBMISSION.md`, and `doc/media-session-capability.md` in the
-tagged source for reproduction steps and the threat model.
+The direct WebRTC path has no STUN or TURN service. It works when host ICE
+candidates are mutually reachable and is not claimed as a general NAT-traversal
+solution.
+
+See `DEMO.md`, `SUBMISSION.md`, and `apps/rendezvous/README.md` in the tagged
+source for reproduction steps and limitations.

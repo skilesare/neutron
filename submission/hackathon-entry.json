@@ -1,11 +1,11 @@
 {
   "title": "Rendezvous",
   "slug": "rendezvous",
-  "summary": "Private peer-to-peer scheduling for sovereign personal clouds. Each person's Calendar filters availability locally; only explicitly selected candidate times cross a paid, caller-bound Neutron route. Contacts provides locally trusted peer names, holds and revision checks prevent double-booking, and the experimental Kernel-brokered media surface connects confirmed participants directly in the browser.",
+  "summary": "Private peer-to-peer scheduling for sovereign personal clouds. Each person's Calendar filters availability locally; only explicitly selected candidate times cross a paid, caller-bound Neutron route. Contacts provides locally trusted peer names, holds and revision checks prevent double-booking, and Neutron's tile-scoped browser capability lets confirmed participants connect directly with WebRTC.",
   "sourceUrl": "https://github.com/skilesare/neutron/tree/rendezvous-hackathon",
-  "demoUrl": "https://github.com/skilesare/neutron/releases/download/rendezvous-v0.3.0/rendezvous-demo.mp4",
+  "demoUrl": "https://github.com/skilesare/neutron/releases/download/rendezvous-v0.3.1/rendezvous-demo.mp4",
   "icon": "apps/rendezvous/public/static/icon.png",
-  "package": "apps/rendezvous/rendezvous.v0.3.0.neutron",
+  "package": "apps/rendezvous/rendezvous.v0.3.1.neutron",
   "screenshots": [
     "submission-assets/01-alice-proposal.jpg",
     "submission-assets/02-bob-received.jpg",

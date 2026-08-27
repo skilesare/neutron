@@ -1,17 +1,18 @@
 import { expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { type NeutronManifest } from "neutron-tools/src/schema.js";
 import { validate_neutron_conf } from "neutron-tools/src/validate_schema.js";
 
 const manifestUrl = new URL("../neutron.json", import.meta.url);
 
-test("Rendezvous 0.3.0 declares composition, paid signaling transport, and bounded media access", async () => {
+test("Rendezvous 0.3.1 declares composition, paid signaling transport, and tile-scoped browser media", async () => {
   const manifest = JSON.parse(await readFile(manifestUrl, "utf8")) as NeutronManifest;
   expect(validate_neutron_conf(manifest).valid).toBe(true);
   expect(manifest).toMatchObject({
     id: "rendezvous",
     name: "Rendezvous",
-    version: 300,
+    version: 301,
     func: { rendezvous_status: { type: "query", async: false } },
     memory: { rendezvous: { version: 2 } },
   });
@@ -30,11 +31,9 @@ test("Rendezvous 0.3.0 declares composition, paid signaling transport, and bound
   expect(manifest.capabilities?.public_ingress?.routes?.[0]).toMatchObject({ protocol: "rendezvous_v1", id: "exchange", required_cycles: 250000000 });
   expect(manifest.capabilities?.backend_calls?.max_cycles_per_call).toBe(250000000);
   expect(manifest.capabilities?.public_ingress?.routes?.[1]).toMatchObject({ protocol: "rendezvous_signal_v1", id: "signal", required_cycles: 250000000 });
-  expect(manifest.capabilities?.media_sessions).toEqual({
+  expect(manifest.capabilities?.browser_permissions).toEqual({
     api: 1,
-    entrypoint: "media.html",
-    features: ["camera", "microphone"],
-    max_duration_seconds: 3600,
+    tiles: [{ id: "main", features: ["camera", "microphone"] }],
   });
 });
 
@@ -59,25 +58,22 @@ test("Rendezvous tile has owner actions and uncertainty-safe copy", async () => 
   expect(frontend).toContain("onTileViewRequest");
   expect(frontend).toContain("Calendar range imported");
   expect(frontend).toContain("address checked again before send");
-  expect(frontend).toContain("capabilities.media_sessions.open");
+  expect(frontend).toContain("MeetingPanel");
   expect(frontend).toContain("Join video meeting");
   expect(frontend).toContain("peer_name");
   expect(frontend).toContain("Unknown Neutron");
   expect(frontend).not.toContain("From another Neutron");
 });
 
-test("Rendezvous media entrypoint is self-contained and stops every captured track", async () => {
-  const source = await readFile(new URL("../src/media.ts", import.meta.url), "utf8");
-  const media = await readFile(new URL("../dist/web/media.html", import.meta.url), "utf8");
+test("Rendezvous meeting panel uses the approved tile media surface and stops every captured track", async () => {
+  const source = await readFile(new URL("../src/MeetingPanel.tsx", import.meta.url), "utf8");
   expect(source).toContain("navigator.mediaDevices.getUserMedia({ audio: true, video: true })");
   expect(source).toContain("RTCPeerConnection");
   expect(source).toContain("rendezvous_signal_send_v1");
   expect(source).toContain("rendezvous_signal_poll_v1");
-  expect(source).toContain('addEventListener("pagehide", closeDevices)');
-  expect(media).toContain("Direct browser connection");
-  expect(media).not.toContain("/*__RENDEZVOUS_MEDIA_SCRIPT__*/");
-  expect(media).not.toContain("[!/*__RENDEZVOUS_MEDIA_SCRIPT__*/");
-  expect(media).not.toMatch(/<(?:script|link|img|video|audio)[^>]+(?:src|href)=["']https?:/i);
+  expect(source).toContain("Direct browser connection");
+  expect(source).toContain("track.stop()");
+  expect(source).not.toMatch(/<(?:script|link|img|video|audio)[^>]+(?:src|href)=["']https?:/i);
 });
 
 test("Rendezvous journals retry bytes before dispatching the broker call", async () => {
@@ -93,6 +89,7 @@ test("Rendezvous bundles the Neutron design system", async () => {
   const css = await readFile(new URL("../dist/web/main.css", import.meta.url), "utf8");
   expect(css).toContain(".nt-app");
   expect(css).toContain("--nt-bg-panel");
+  expect(existsSync(new URL("../dist/web/media.html", import.meta.url))).toBe(false);
 });
 
 test("Rendezvous tray is actionable and exposes counts rather than meeting metadata", async () => {

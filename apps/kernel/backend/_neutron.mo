@@ -6,7 +6,7 @@
 
 import NeutronPrim "mo:prim";
 import NeutronModule_a6_kernel "main";
-import NeutronMemorySchema_a6_kernel_r6_kernel_v4 "memory/kernel/v4";
+import NeutronMemorySchema_a6_kernel_r6_kernel_v3 "memory/kernel/v3";
 import NeutronMemorySchema_a6_kernel_r17_kernel_activation_v1 "memory/activation/v1";
 
 
@@ -50,12 +50,12 @@ shared({caller = NeutronInstaller}) persistent actor class Class<system>() = Neu
 
 
     type NeutronMemoryType_a6_kernel_r6_kernel = {
-        #v4 : NeutronMemorySchema_a6_kernel_r6_kernel_v4.Mem;
+        #v3 : NeutronMemorySchema_a6_kernel_r6_kernel_v3.Mem;
     };
 
-    let NeutronMemoryStore_a6_kernel_r6_kernel:NeutronMemoryType_a6_kernel_r6_kernel = #v4(NeutronMemorySchema_a6_kernel_r6_kernel_v4.init());
+    let NeutronMemoryStore_a6_kernel_r6_kernel:NeutronMemoryType_a6_kernel_r6_kernel = #v3(NeutronMemorySchema_a6_kernel_r6_kernel_v3.init());
 
-    transient let #v4(NeutronMemory_a6_kernel_r6_kernel) = NeutronMemoryStore_a6_kernel_r6_kernel;
+    transient let #v3(NeutronMemory_a6_kernel_r6_kernel) = NeutronMemoryStore_a6_kernel_r6_kernel;
 
 
     type NeutronMemoryType_a6_kernel_r17_kernel_activation = {
@@ -76,13 +76,18 @@ shared({caller = NeutronInstaller}) persistent actor class Class<system>() = Neu
     };
 
 
-    transient let NeutronActiveAppInstanceInventory = [{ app_id = "kernel"; version = 313; capability_plan_fingerprint = "298b3b0f4ba7a2880a041b0b8b4bc1cdf6cb09c45697ee1d097459a7d352e5ec"; resident_frame_security = #credentialless_opaque_v1 }];
+    transient let NeutronActiveAppInstanceInventory = [{ app_id = "kernel"; version = 317; capability_plan_fingerprint = "39f7c64aeec7582f2a365d2d192bae23ec7b0ed120be933cf257dab000ba65cb"; resident_frame_security = #credentialless_opaque_v1 }];
 
 
 
 
     transient let NeutronKernel = NeutronModule_a6_kernel.Init(NeutronMemory_a6_kernel_r6_kernel,NeutronMemory_a6_kernel_r17_kernel_activation,"development",NeutronActiveAppInstanceInventory,NeutronPrim.principalOfActor(NeutronActor));
 
+
+
+      private func NeutronAppFunction_a6_kernel_r29_capability_authority_revision(NeutronRequest: NeutronModule_a6_kernel.capability_authority_revision_Input) :  NeutronModule_a6_kernel.capability_authority_revision_Output {
+         NeutronKernel.capability_authority_revision(NeutronRequest)
+      };
 
 
     public shared({ caller = NeutronCaller }) func kernel_authorized_add(NeutronRequest: NeutronModule_a6_kernel.kernel_authorized_add_Input) : async NeutronModule_a6_kernel.kernel_authorized_add_Output {
@@ -260,18 +265,6 @@ shared({caller = NeutronInstaller}) persistent actor class Class<system>() = Neu
     public shared({ caller = NeutronCaller }) func kernel_capability_set_enabled(NeutronRequest: NeutronModule_a6_kernel.kernel_capability_set_enabled_Input) : async NeutronModule_a6_kernel.kernel_capability_set_enabled_Output {
         assert(NeutronKernel.is_authorized(NeutronCaller));
          NeutronKernel.kernel_capability_set_enabled(NeutronRequest ,NeutronCaller)
-    };
-
-
-    public shared({ caller = NeutronCaller }) func kernel_media_session_begin(NeutronRequest: NeutronModule_a6_kernel.kernel_media_session_begin_Input) : async NeutronModule_a6_kernel.kernel_media_session_begin_Output {
-        assert(NeutronKernel.is_authorized(NeutronCaller));
-        await* NeutronKernel.kernel_media_session_begin(NeutronRequest ,NeutronCaller)
-    };
-
-
-    public shared({ caller = NeutronCaller }) func kernel_media_session_close(NeutronRequest: NeutronModule_a6_kernel.kernel_media_session_close_Input) : async NeutronModule_a6_kernel.kernel_media_session_close_Output {
-        assert(NeutronKernel.is_authorized(NeutronCaller));
-         NeutronKernel.kernel_media_session_close(NeutronRequest ,NeutronCaller)
     };
 
 
@@ -469,6 +462,8 @@ shared({caller = NeutronInstaller}) persistent actor class Class<system>() = Neu
       resident_frames = 0;
     });
 
+
+
     NeutronKernel.configure_app_capabilities([], {
       vetkeys_environment = #production;
       chain_key_signing_keys = {
@@ -493,6 +488,7 @@ shared({caller = NeutronInstaller}) persistent actor class Class<system>() = Neu
       deployment_id : Text;
       assembler_id : Text;
       compiler_id : Text;
+      capability_authority_revision : ?Nat64;
       apps : [{
         scope : { app_id : Text; installation_uid : Nat64 };
         version : Nat;
@@ -511,10 +507,11 @@ shared({caller = NeutronInstaller}) persistent actor class Class<system>() = Neu
       assert(NeutronKernel.is_authorized(NeutronCaller));
       {
         deployment_id = "development";
-        assembler_id = "neutron_actor_v25";
+        assembler_id = "neutron_actor_v26";
         compiler_id = "unknown";
+        capability_authority_revision = ?NeutronKernel.capability_authority_revision();
         apps = NeutronKernel.runtime_app_instances("development");
-        memories = [{ id = "kernel"; owner = "kernel"; version = 4; schema = "memory/kernel/v4" }, { id = "kernel_activation"; owner = "kernel"; version = 1; schema = "memory/activation/v1" }];
+        memories = [{ id = "kernel"; owner = "kernel"; version = 3; schema = "memory/kernel/v3" }, { id = "kernel_activation"; owner = "kernel"; version = 1; schema = "memory/activation/v1" }];
       }
     };
 

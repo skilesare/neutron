@@ -2,7 +2,7 @@
   "format": 3,
   "name": "Rendezvous",
   "id": "rendezvous",
-  "version": 300,
+  "version": 301,
   "description": "Peer scheduling between independently owned Neutron canisters",
   "src": "main.mo",
   "backend": {
@@ -34,14 +34,17 @@
     }
   },
   "capabilities": {
-    "media_sessions": {
+    "browser_permissions": {
       "api": 1,
-      "entrypoint": "media.html",
-      "features": [
-        "camera",
-        "microphone"
-      ],
-      "max_duration_seconds": 3600
+      "tiles": [
+        {
+          "id": "main",
+          "features": [
+            "camera",
+            "microphone"
+          ]
+        }
+      ]
     },
     "public_ingress": {
       "api": 1,

@@ -287,11 +287,7 @@ export class VetKeysBrowserBroker {
     // Recovery is app-internal work. A delegated tool invocation has already
     // crossed the kernel's cross-app permission boundary, so it does not add a
     // second vetKeys consent gate here.
-    if (
-      endpoint.context.role === "tray" ||
-      endpoint.context.role === "media" ||
-      !reportProgress
-    ) {
+    if (endpoint.context.role === "tray" || !reportProgress) {
       throw vetKeysError("source_gone");
     }
     const requesterSessionId = requireSession(endpoint);

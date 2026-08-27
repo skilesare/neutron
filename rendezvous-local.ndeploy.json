@@ -14,11 +14,11 @@
   },
   "artifacts": {
     "kind": "inline",
-    "kernel": { "path": "apps/kernel/kernel.v0.3.13.neutron" },
+    "kernel": { "path": "apps/kernel/kernel.v0.3.17.neutron" },
     "packages": [
       { "path": "apps/contacts/contacts.v0.3.1.neutron" },
       { "path": "apps/calendar/calendar.v0.2.0.neutron" },
-      { "path": "apps/rendezvous/rendezvous.v0.3.0.neutron" }
+      { "path": "apps/rendezvous/rendezvous.v0.3.1.neutron" }
     ]
   }
 }

@@ -1,7 +1,7 @@
 import esbuild from "esbuild";
 import copyStaticFiles from "esbuild-copy-static-files";
 import { sassPlugin } from "esbuild-sass-plugin";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import type { BuildOptions } from "esbuild";
 
 const outfile = "./dist/web/main.js";
@@ -12,18 +12,6 @@ async function stripRemoteDiagnostics(): Promise<void> {
   if (sanitized !== source) {
     await writeFile(outfile, sanitized);
   }
-}
-
-async function buildMediaEntrypoint(): Promise<void> {
-  const result = await esbuild.build({ entryPoints: ["./src/media.ts"], bundle: true, minify: true, format: "iife", platform: "browser", write: false });
-  const script = result.outputFiles[0]?.text;
-  if (!script) throw new Error("Rendezvous media bundle was empty");
-  const template = await readFile("./public/media.html", "utf8");
-  const marker = "/*__RENDEZVOUS_MEDIA_SCRIPT__*/";
-  if (!template.includes(marker)) throw new Error("Rendezvous media template marker is missing");
-  // A replacement callback preserves `$&`, `$\`` and `$'` byte-for-byte in
-  // bundled dependencies instead of treating them as String.replace tokens.
-  await writeFile("./dist/web/media.html", template.replace(marker, () => script));
 }
 
 const config: BuildOptions = {
@@ -61,6 +49,7 @@ const config: BuildOptions = {
 };
 
 const args = process.argv.slice(2);
+await rm("./dist/web", { recursive: true, force: true });
 
 if (args[0] === "watch") {
   const ctx = await esbuild.context(config);
@@ -70,7 +59,6 @@ if (args[0] === "watch") {
 } else {
   try {
     await esbuild.build(config);
-    await buildMediaEntrypoint();
   } catch {
     process.exit(1);
   }

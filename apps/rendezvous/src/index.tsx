@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { cx, nt } from "neutron-design-system";
-import { capabilities, loadNeutronCanisterId, onTileViewRequest, querySelf, updateSelf } from "neutron-tools/app";
+import { loadNeutronCanisterId, onTileViewRequest, querySelf, updateSelf } from "neutron-tools/app";
 import { parseCalendarScheduleView } from "./calendar_handoff";
 import { encodeAddress, resolvePeer } from "./invite";
+import { MeetingPanel } from "./MeetingPanel";
 import "./style.scss";
 
 type Negotiation = { id: Uint8Array; revision: string; direction: string | Record<string, unknown>; peer?: string | string[]; peer_name?: string | string[]; state: string | Record<string, unknown>; title: string; duration_minutes: number; candidate_starts_ns: string[]; selected_start_ns?: string | string[]; expires_at_ns: string; delivery: string | Record<string, unknown> };
@@ -68,18 +69,15 @@ export const App = () => {
   const [countering, setCountering] = useState<string | null>(null); const [counterDrafts, setCounterDrafts] = useState<Record<string, string>>({});
   const [calendarHandoff, setCalendarHandoff] = useState(false);
   const [meetingHandoff, setMeetingHandoff] = useState<{ startNs: string; endNs: string } | null>(null); const [focusedMeeting, setFocusedMeeting] = useState<string | null>(null);
+  const [activeMeeting, setActiveMeeting] = useState<Negotiation | null>(null);
   const startMeeting = async (item: Negotiation) => {
     try {
-      setMessage("Waiting for Kernel media approval…");
+      setMessage("Opening the meeting in this app tile…");
       const selected = await updateSelf("rendezvous_media_select_v1", [{ id: item.id }]);
       const problem = backendProblem(selected);
       if (problem) throw new Error(problem);
-      await capabilities.media_sessions.open({
-        features: ["camera", "microphone"],
-        purpose: `Join “${item.title}” with browser-to-browser audio and video`,
-        durationSeconds: 3600,
-      });
-      setMessage("Media surface opened. Use its controls to preview and end the call.");
+      setActiveMeeting(item);
+      setMessage("Meeting ready. Start camera and microphone when you choose.");
     } catch (error) {
       setMessage(describeError(error));
     }
@@ -232,6 +230,7 @@ export const App = () => {
       {step === 3 && <><p className="privacy">These options are available locally. Check exactly what you want to share (up to 16).</p>{suggestions.length === 0 && <div className="availability-empty" role="status"><strong>No available times matched this search</strong><span>Try a wider window, different days, or another time of day.</span></div>}<div className="manual-option"><label>Add a specific time<input type="datetime-local" min={dateTimeInput(new Date())} value={manualOption} onChange={(event) => setManualOption(event.target.value)} /></label><button className="nt-button nt-button--sm" disabled={busy || selected.length >= 16} onClick={() => void addManualOption()} type="button">Check and add</button></div><p className="selection-count" aria-live="polite"><strong>{selected.length}</strong> of 16 selected</p><div className="suggestions">{groupedSuggestions.map(([day, values]) => <section className="suggestion-day" aria-labelledby={`suggestion-${values[0]}`} key={day}><h3 id={`suggestion-${values[0]}`}>{day}</h3>{values.map((value) => <label key={value}><input type="checkbox" checked={selected.includes(value)} disabled={!selected.includes(value) && selected.length >= 16} onChange={() => toggleOption(value)} /><span>{optionFormat.format(dateFromNs(value))}</span></label>)}</section>)}</div><div className="actions"><button className="nt-button nt-button--sm" onClick={() => setStep(2)} type="button">Back</button><button className="nt-button" disabled={selected.length === 0} onClick={() => setStep(4)} type="button">Review {selected.length} option{selected.length === 1 ? "" : "s"}</button></div></>}
       {step === 4 && <><div className="review"><p><strong>{title}</strong></p><p>To {selectedContact?.contact_name ?? "the reviewed Rendezvous address"}</p><p>{duration} minutes · {selected.length} exact option{selected.length === 1 ? "" : "s"}</p><ol>{[...selected].sort().map((value) => <li key={value}>{optionFormat.format(dateFromNs(value))}</li>)}</ol></div><p className="privacy">Only the title, duration, and selected starts go to this peer. No Contact name, event name, or busy interval leaves your Neutron.</p><div className="actions"><button className="nt-button nt-button--sm" onClick={() => setStep(3)} type="button">Back</button><button className="nt-button" disabled={busy} onClick={() => void propose()} type="button">Send proposal</button></div></>}
     </section></div>{message && <output className="nt-result status-message" aria-live="polite">{message}</output>}
+    {activeMeeting && <MeetingPanel fallbackTitle={activeMeeting.title} onClose={() => setActiveMeeting(null)} />}
   </div></main>;
 };
 const root = document.getElementById("root"); if (!root) throw new Error("Root element not found"); createRoot(root).render(<App />);

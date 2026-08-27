@@ -2,8 +2,19 @@ import type { Schema } from "jsonschema";
 import { Principal } from "@dfinity/principal";
 import { compareCanonicalText } from "../canonical.ts";
 import { CANISTER_METHOD_MAX_LENGTH } from "../physical_names.ts";
+import {
+  isValidTileId,
+  TILE_ID_MAX_LENGTH,
+  TILE_ID_SCHEMA_PATTERN,
+} from "../tile_ids.ts";
 
 export const CAPABILITY_API_VERSION = 1 as const;
+
+export const BROWSER_PERMISSION_FEATURES = [
+  "camera",
+  "microphone",
+] as const;
+export const BROWSER_PERMISSIONS_MAX_TILES = 16;
 
 export const ETHEREUM_PROVIDER_METHODS = [
   "eth_requestAccounts",
@@ -73,6 +84,8 @@ export const CERTIFIED_ASSETS_MAX_IDEMPOTENCY_RECEIPTS = 4_096;
 // Mirrors certified_http_v2.CERTIFIED_HTTP_PATH_SEGMENTS_MAX_V2. Every
 // certified-assets path is served below /app/<app>/_route/<mount>.
 export const CERTIFIED_HTTP_PATH_SEGMENTS_MAX_V2 = 14;
+/** Must match CertV2.CERTIFIED_HTTP_PATH_SEGMENT_BYTES_MAX_V2. */
+export const CERTIFIED_HTTP_PATH_SEGMENT_BYTES_MAX_V2 = 1_024;
 export const CERTIFIED_ASSETS_GLOBAL_ACTIVE_STAGES_MAX = 4;
 export const CERTIFIED_ASSETS_PHYSICAL_RESERVATION_POLICY_V1 = Object.freeze({
   id: "neutron.certified-assets.physical-reservation.v1",
@@ -121,9 +134,6 @@ export const BACKEND_CALLS_MAX_CYCLES_PER_DAY = 1_000_000_000_000_000;
 export const BACKEND_CALLS_MAX_INSTALL_RESERVATIONS_PER_APP = 64;
 /** Must match backend_calls/Memory.MAX_TOTAL. */
 export const BACKEND_CALLS_MAX_INSTALL_RESERVATIONS_GLOBAL = 2_048;
-export const MEDIA_SESSION_FEATURES = ["camera", "microphone"] as const;
-export const MEDIA_SESSION_MIN_DURATION_SECONDS = 300;
-export const MEDIA_SESSION_MAX_DURATION_SECONDS = 14_400;
 
 const PROVIDER_ID_PATTERN = /^[a-z][a-z0-9_]{1,31}$/;
 const SCOPE_PATTERN = /^[a-zA-Z0-9._:/-]+$/;
@@ -243,10 +253,10 @@ export const DECLARED_CAPABILITY_IDS = [
   "connections",
   "persistent_browser_storage",
   "dedicated_resident_origin",
-  "media_sessions",
   "public_ingress",
   "http_routes",
   "certified_assets",
+  "browser_permissions",
 ] as const;
 
 export const DERIVED_CAPABILITY_IDS = [
@@ -595,20 +605,6 @@ export const CAPABILITY_CATALOG = Object.freeze({
     audit:
       "Origin allocation, authority rotation, launch denial, and lifecycle outcomes.",
   }),
-  media_sessions: declared("media_sessions", {
-    delivery: ["frontend_endpoint"],
-    title: "Call camera and microphone",
-    summary:
-      "Open one explicit, short-lived media surface with only the declared devices.",
-    grant: "owner_runtime_grant",
-    escalation: "owner_approval",
-    disable: "broker_enforced",
-    revocation: "live_recheck",
-    quota:
-      "One live media surface per app and globally; each lease lasts 5 minutes to 4 hours within the declared ceiling.",
-    audit:
-      "Bounded metadata-only open, approve, deny, start, close, expire, and failure totals; no signaling, peer, device, or media data.",
-  }),
   public_ingress: declared("public_ingress", {
     delivery: ["compiler_registration"],
     title: "Public protocol ingress",
@@ -647,6 +643,20 @@ export const CAPABILITY_CATALOG = Object.freeze({
       "Install-reviewed collection, entry, committed-byte, object, stage, batch, and idempotency maxima; public plaintext is bounded to 100,000 records and 1 GiB per installation.",
     audit:
       "Metadata-only bounded stage, publish, conditional delete, maintenance, denial, and configuration outcomes; bodies and public query serving are not retained in audit.",
+  }),
+  browser_permissions: declared("browser_permissions", {
+    delivery: ["frontend_endpoint", "compiler_registration"],
+    title: "Browser device access",
+    summary:
+      "Let exact open tiles request declared browser device features; capture may continue while an open tile's workspace is hidden.",
+    grant: "declaration",
+    escalation: "owner_approval",
+    disable: "registration_enforced",
+    revocation: "remove_registration",
+    quota:
+      "At most 16 exact tiles and the closed camera and microphone feature set.",
+    audit:
+      "The approved declaration is retained in the capability plan; browser prompts, decisions, and device use are not observed or audited by Neutron.",
   }),
   certified_read_routes: derived("certified_read_routes", {
     delivery: ["compiler_registration"],
@@ -1031,13 +1041,15 @@ export type NeutronDedicatedResidentOriginCapabilityConfig = {
   surface: "background";
   mode: "credentialless_ephemeral_v1";
 };
-export type NeutronMediaSessionFeatureV1 =
-  (typeof MEDIA_SESSION_FEATURES)[number];
-export type NeutronMediaSessionsCapabilityConfig = {
+export type NeutronBrowserPermissionFeature =
+  (typeof BROWSER_PERMISSION_FEATURES)[number];
+export type NeutronBrowserPermissionTileConfig = {
+  id: string;
+  features: NeutronBrowserPermissionFeature[];
+};
+export type NeutronBrowserPermissionsCapabilityConfig = {
   api: 1;
-  entrypoint: string;
-  features: NeutronMediaSessionFeatureV1[];
-  max_duration_seconds: number;
+  tiles: NeutronBrowserPermissionTileConfig[];
 };
 export type NeutronResidentFrameSecurityMode =
   | "credentialless_opaque_v1"
@@ -1355,10 +1367,10 @@ export type NeutronCapabilitiesConfig = {
   connections?: NeutronConnectionsCapabilityConfig;
   persistent_browser_storage?: NeutronPersistentBrowserStorageCapabilityConfig;
   dedicated_resident_origin?: NeutronDedicatedResidentOriginCapabilityConfig;
-  media_sessions?: NeutronMediaSessionsCapabilityConfig;
   public_ingress?: NeutronPublicIngressCapabilityConfig;
   http_routes?: NeutronHttpRoutesCapabilityConfig;
   certified_assets?: NeutronCertifiedAssetsCapabilityConfig;
+  browser_permissions?: NeutronBrowserPermissionsCapabilityConfig;
 };
 
 export type NormalizedNeutronCapabilitiesConfig = Omit<
@@ -1378,6 +1390,7 @@ type NormalizeText = (
 export type CapabilityNormalizationContext = {
   appId?: string;
   hasBackground: boolean;
+  tileIds?: readonly string[];
   normalizeText: NormalizeText;
 };
 
@@ -1425,31 +1438,6 @@ function sortedUniqueStrings(
     seen.add(item);
   }
   return [...seen].sort(compareCanonicalText);
-}
-
-function assertSafeRelativeCapabilityAssetPath(
-  value: unknown,
-  label: string,
-): asserts value is string {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`Invalid ${label}`);
-  }
-  if (value.startsWith("/") || value.includes("\\")) {
-    throw new Error(`Unsafe ${label} ${value}`);
-  }
-  if (value.includes("?") || value.includes("#")) {
-    throw new Error(`Unsafe ${label} ${value}`);
-  }
-  if (
-    value
-      .split("/")
-      .some(
-        (segment) =>
-          segment.length === 0 || segment === "." || segment === "..",
-      )
-  ) {
-    throw new Error(`Unsafe ${label} ${value}`);
-  }
 }
 
 function positiveBoundedInteger(
@@ -2251,42 +2239,44 @@ function normalizeCapabilityDeclarationFields(
     };
   }
 
-  const mediaSessions = declaration.media_sessions;
-  if (mediaSessions !== undefined) {
-    assertClosed(mediaSessions, "media_sessions capability", [
+  const browserPermissions = declaration.browser_permissions;
+  if (browserPermissions !== undefined) {
+    assertClosed(browserPermissions, "browser_permissions capability", [
       "api",
-      "entrypoint",
-      "features",
-      "max_duration_seconds",
+      "tiles",
     ]);
-    assertApi(mediaSessions, "media_sessions");
-    assertSafeRelativeCapabilityAssetPath(
-      mediaSessions.entrypoint,
-      "media_sessions entrypoint",
-    );
-    const features = sortedUniqueStrings(
-      mediaSessions.features,
-      "media_sessions feature",
-      1,
-      MEDIA_SESSION_FEATURES.length,
-      (feature) =>
-        feature === "camera" || feature === "microphone",
-    ) as NeutronMediaSessionFeatureV1[];
+    assertApi(browserPermissions, "browser_permissions");
     if (
-      !Number.isSafeInteger(mediaSessions.max_duration_seconds) ||
-      Number(mediaSessions.max_duration_seconds) <
-        MEDIA_SESSION_MIN_DURATION_SECONDS ||
-      Number(mediaSessions.max_duration_seconds) >
-        MEDIA_SESSION_MAX_DURATION_SECONDS
+      !Array.isArray(browserPermissions.tiles) ||
+      browserPermissions.tiles.length < 1 ||
+      browserPermissions.tiles.length > BROWSER_PERMISSIONS_MAX_TILES
     ) {
-      throw new Error("Invalid media_sessions max_duration_seconds");
+      throw new Error("Invalid browser_permissions tiles");
     }
-    normalized.media_sessions = {
-      api: 1,
-      entrypoint: mediaSessions.entrypoint,
-      features,
-      max_duration_seconds: Number(mediaSessions.max_duration_seconds),
-    };
+    const tileIds = new Set<string>();
+    const allowedFeatures = new Set<string>(BROWSER_PERMISSION_FEATURES);
+    const tiles = browserPermissions.tiles.map((tile) => {
+      assertClosed(tile, "browser_permissions tile", ["id", "features"]);
+      if (!isValidTileId(tile.id)) {
+        throw new Error("Invalid browser_permissions tile id");
+      }
+      if (tileIds.has(tile.id)) {
+        throw new Error(`Duplicate browser_permissions tile ${tile.id}`);
+      }
+      tileIds.add(tile.id);
+      return {
+        id: tile.id,
+        features: sortedUniqueStrings(
+          tile.features,
+          `browser_permissions feature for ${tile.id}`,
+          1,
+          BROWSER_PERMISSION_FEATURES.length,
+          (feature) => allowedFeatures.has(feature),
+        ) as NeutronBrowserPermissionFeature[],
+      };
+    });
+    tiles.sort((left, right) => compareCanonicalText(left.id, right.id));
+    normalized.browser_permissions = { api: 1, tiles };
   }
 
   const publicIngress = declaration.public_ingress;
@@ -3403,29 +3393,41 @@ function createCapabilityDeclarationFieldsSchema(
         required: ["api", "surface", "mode"],
         additionalProperties: false,
       },
-      media_sessions: {
+      browser_permissions: {
         type: "object",
         properties: {
           api,
-          entrypoint: {
-            type: "string",
-            minLength: 1,
-            pattern: "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//)(?!.*\\\\).+$",
-          },
-          features: {
+          tiles: {
             type: "array",
             minItems: 1,
-            maxItems: MEDIA_SESSION_FEATURES.length,
+            maxItems: BROWSER_PERMISSIONS_MAX_TILES,
             uniqueItems: true,
-            items: { type: "string", enum: [...MEDIA_SESSION_FEATURES] },
-          },
-          max_duration_seconds: {
-            type: "integer",
-            minimum: MEDIA_SESSION_MIN_DURATION_SECONDS,
-            maximum: MEDIA_SESSION_MAX_DURATION_SECONDS,
+            items: {
+              type: "object",
+              properties: {
+                id: {
+                  type: "string",
+                  minLength: 1,
+                  maxLength: TILE_ID_MAX_LENGTH,
+                  pattern: TILE_ID_SCHEMA_PATTERN,
+                },
+                features: {
+                  type: "array",
+                  minItems: 1,
+                  maxItems: BROWSER_PERMISSION_FEATURES.length,
+                  uniqueItems: true,
+                  items: {
+                    type: "string",
+                    enum: [...BROWSER_PERMISSION_FEATURES],
+                  },
+                },
+              },
+              required: ["id", "features"],
+              additionalProperties: false,
+            },
           },
         },
-        required: ["api", "entrypoint", "features", "max_duration_seconds"],
+        required: ["api", "tiles"],
         additionalProperties: false,
       },
       public_ingress: {
@@ -3938,12 +3940,14 @@ export function normalizeCapabilityDeclarations(
   }
   assertCapabilityComposition(
     normalized as NormalizedNeutronCapabilitiesConfig,
+    context,
   );
   return normalized as NormalizedNeutronCapabilitiesConfig;
 }
 
 export function assertCapabilityComposition(
   normalized: NormalizedNeutronCapabilitiesConfig,
+  context: Pick<CapabilityNormalizationContext, "tileIds"> = {},
 ): void {
   if (
     normalized.persistent_browser_storage &&
@@ -3952,6 +3956,16 @@ export function assertCapabilityComposition(
     throw new Error(
       "dedicated_resident_origin and persistent_browser_storage are mutually exclusive",
     );
+  }
+  if (normalized.browser_permissions) {
+    const declaredTileIds = new Set(context.tileIds ?? []);
+    for (const tile of normalized.browser_permissions.tiles) {
+      if (!declaredTileIds.has(tile.id)) {
+        throw new Error(
+          `browser_permissions references undeclared tile ${tile.id}`,
+        );
+      }
+    }
   }
   const httpRoutes = normalized.http_routes;
   const certifiedAssets = normalized.certified_assets;

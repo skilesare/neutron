@@ -50,28 +50,29 @@ That is the part I wanted to demonstrate: two apps on two user-owned personal
 clouds can produce one useful agreement without inventing a central SaaS
 middleman.
 
-There is also an experimental direct-call path. A confirmed participant must
-approve a Kernel-owned, revocable, one-time media surface. The Neutrons carry
+There is also an experimental direct-call path. Upstream Kernel 0.3.17 grants
+camera and microphone only to Rendezvous's declared, isolated app tile, and a
+confirmed participant explicitly starts their devices there. The Neutrons carry
 bounded WebRTC signaling, while audio and video flow browser-to-browser. This
 preview intentionally has no STUN/TURN relay yet, so it is a direct-connect
 experiment rather than a claim of production-grade Internet conferencing.
 
-- [Watch the 60-second Rendezvous demo on GitHub](https://github.com/skilesare/neutron/releases/download/rendezvous-v0.3.0/rendezvous-demo.mp4)
+- [Watch the 60-second Rendezvous demo on GitHub](https://github.com/skilesare/neutron/releases/download/rendezvous-v0.3.1/rendezvous-demo.mp4)
 - [Alice sends a proposal](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/submission-assets/01-alice-proposal.jpg)
 - [Bob sees Alice by name and chooses a time](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/submission-assets/02-bob-received.jpg)
 - [Alice's confirmed Calendar](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/submission-assets/03-alice-confirmed-calendar.jpg)
 - [Bob's independently owned confirmed Calendar](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/submission-assets/04-bob-confirmed-calendar.jpg)
 - [Calendar meeting detail and Rendezvous handoff](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/submission-assets/05-alice-meeting-details.jpg)
-- [Direct browser media after Kernel consent](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/submission-assets/07-direct-video.jpg)
+- [Direct browser media in the isolated Rendezvous tile](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/submission-assets/07-direct-video.jpg)
 
 ### Try it or inspect it
 
-The combined branch contains Calendar, Contacts, Rendezvous, the experimental
-Kernel media capability, a two-Neutron local configuration, and the end-to-end
+The combined branch contains Calendar, Contacts, Rendezvous, upstream Kernel
+0.3.17, a two-Neutron local configuration, and the end-to-end
 test that drives Alice and Bob through the complete workflow.
 
 - [Combined Calendar + Rendezvous source and try-it guide](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/TRY_RENDEZVOUS.md)
-- [Rendezvous release with all required packages](https://github.com/skilesare/neutron/releases/tag/rendezvous-v0.3.0)
+- [Rendezvous release with all required packages](https://github.com/skilesare/neutron/releases/tag/rendezvous-v0.3.1)
 - [Threat model and implementation details](https://github.com/skilesare/neutron/blob/rendezvous-hackathon/apps/rendezvous/README.md)
 
 ### Please vote in Week 2
@@ -81,5 +82,5 @@ between sovereign personal clouds feels like a useful demonstration of what
 Neutron can do, please [open the Season 1 voting page](https://4576f-3aaaa-aaaam-ajgpq-cai.icp0.io/#/season), choose **Week 2**, and vote for **Rendezvous** after it clears moderator review.
 
 I would especially value feedback on the cross-Neutron protocol, the privacy
-boundary, and whether the Kernel-brokered direct-call experiment is worth
+boundary, and whether the tile-scoped direct-call experiment is worth
 taking toward STUN/TURN support and a production-ready capability.

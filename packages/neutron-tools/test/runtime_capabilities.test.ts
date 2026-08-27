@@ -96,12 +96,6 @@ function manifest(): NeutronManifest {
         ],
       },
       persistent_browser_storage: { api: 1, surface: "background" },
-      media_sessions: {
-        api: 1,
-        entrypoint: "media.html",
-        features: ["camera", "microphone"],
-        max_duration_seconds: 7_200,
-      },
       public_ingress: {
         api: 1,
         routes: [
@@ -202,7 +196,6 @@ test("runtime projection contains only exact broker-enforced resources", () => {
     "connections/openrouter",
     "http_routes/webhook",
     "https_outcalls/example",
-    "media_sessions/default",
     "persistent_browser_storage/background",
     "public_ingress/mail_v1:deliver",
     "public_ingress/mail_v1:probe",
@@ -229,10 +222,6 @@ test("runtime projection contains only exact broker-enforced resources", () => {
   expect(byKey(entries, "backend_calls", "default").grant).toBe(
     "owner_runtime_grant",
   );
-  expect(byKey(entries, "media_sessions", "default")).toMatchObject({
-    grant: "owner_runtime_grant",
-    toggleable: true,
-  });
   expect(byKey(entries, "randomness", "default").grant).toBe("declaration");
   expect(byKey(entries, "chain_key_signing", "a_identity")).toMatchObject({
     grant: "declaration",
@@ -332,7 +321,7 @@ test("runtime projection preflights the kernel's per-app registry bound", () => 
     }),
   );
   candidate.capabilities!.public_ingress!.routes = Array.from(
-    { length: 31 },
+    { length: 32 },
     (_, index) => ({
       protocol: "rpc",
       id: `route_${index}`,
@@ -354,10 +343,9 @@ test("runtime projection preflights the kernel's per-app registry bound", () => 
   );
 
   // Every declaration is at or below its own supported maximum. Four root
-  // resources (including the media lease), four private-key slots, four
-  // assertion-key slots, two tasks, eight providers, 31 ingress routes, one
-  // HTTPS endpoint, one POST route, and eight derived certified read routes
-  // compose to the exact 64 bound.
+  // resources, four private-key slots, four assertion-key slots, two tasks,
+  // eight providers, 32 ingress routes, one HTTPS endpoint, one POST route,
+  // and eight derived certified read routes compose to the exact 64 bound.
   expect(
     projectRuntimeCapabilityRegistrationsV1(buildCapabilityPlan(candidate)),
   ).toHaveLength(RUNTIME_CAPABILITY_MAX_PER_APP);
@@ -390,7 +378,7 @@ test("runtime projection rejects forged over-limit plans defensively", () => {
     max_response_bytes: 16,
   }));
   expect(() => projectRuntimeCapabilityRegistrationsV1(plan)).toThrow(
-    "projects 70 runtime resources; maximum is 64",
+    "projects 69 runtime resources; maximum is 64",
   );
 });
 
@@ -593,13 +581,20 @@ test("http_post_update_handler registration fingerprints its exact bounded autho
 });
 
 test("structural-only plans produce no runtime registry records", () => {
-  const entries = projectRuntimeCapabilityRegistrationsV1(
-    buildCapabilityPlan({
+  const plan = buildCapabilityPlan({
       format: 3,
       id: "plain_app",
       name: "Plain",
       version: 100,
       tiles: [{ id: "main", title: "Main", path: "index.html" }],
+      capabilities: {
+        browser_permissions: {
+          api: 1,
+          tiles: [
+            { id: "main", features: ["microphone", "camera"] },
+          ],
+        },
+      },
       memory: {
         plain: {
           version: 1,
@@ -607,8 +602,16 @@ test("structural-only plans produce no runtime registry records", () => {
           migrations: [],
         },
       },
-    }),
-  );
+    });
+  expect(
+    plan.entries.find(({ id }) => id === "browser_permissions"),
+  ).toMatchObject({
+    id: "browser_permissions",
+    config: {
+      tiles: [{ id: "main", features: ["camera", "microphone"] }],
+    },
+  });
+  const entries = projectRuntimeCapabilityRegistrationsV1(plan);
   expect(entries).toEqual([]);
 });
 

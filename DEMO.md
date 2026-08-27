@@ -99,9 +99,10 @@ exception, draggable event that does not persist, stale drag that does not roll
 back visibly, selectable busy option, duplicated invitation, private-title
 leak, or reload data loss.
 
-Video now uses the reviewed P5 architecture: an ordinary app tile still denies
-camera and microphone, while an explicit Join action opens a Kernel-owned,
-revocable one-time nonce-origin media surface. The P6 installed two-browser
-fake-media path passes. For the demo, describe it as direct browser WebRTC with
+Video now uses upstream Kernel 0.3.17's tile-scoped browser capability.
+Calendar still receives no media authority; Rendezvous's exact isolated `main`
+tile receives camera and microphone because its manifest declares both. Devices
+remain off until the user clicks Start in the visible meeting panel. The P6
+installed two-browser fake-media path passes. For the demo, describe it as direct browser WebRTC with
 Neutron-carried signaling—not production Internet calling—because STUN/TURN and
 relay fallback are not configured yet.

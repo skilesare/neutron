@@ -5,23 +5,23 @@ import {spawnSync} from "node:child_process";
 import {resolve} from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const tag = "rendezvous-v0.3.0";
+const tag = "rendezvous-v0.3.1";
 const target = "rendezvous-hackathon";
 const publish = process.argv.includes("--publish");
 const files = [
-  "apps/kernel/kernel.v0.3.13.neutron",
+  "apps/kernel/kernel.v0.3.17.neutron",
   "apps/contacts/contacts.v0.3.1.neutron",
   "apps/calendar/calendar.v0.2.0.neutron",
-  "apps/rendezvous/rendezvous.v0.3.0.neutron",
+  "apps/rendezvous/rendezvous.v0.3.1.neutron",
   "submission-assets/rendezvous-demo.mp4",
 ];
 
 const expected = new Map([
-  [files[0], "fd62a090014de2636c8b9774aa327f7cc95f20d4f1922c1d30990cb5082b1488"],
+  [files[0], "73562b715b3e61d319e7e8c8aa9f953ac01e81f1dc113afded64f2ce0da4896b"],
   [files[1], "19591c8db038db92c182b70ce0761e855efc1e7e7f37d3b1503866baa11d097a"],
   [files[2], "8e95eb974ed2025b94a4be21611ee79d5aa5c44a7ba394b7c46fd4db08db15c1"],
-  [files[3], "85a6893c2bed02c20ff45a8c15560a5a9c3432967a6cc6d0f8e8504a7c78840f"],
-  [files[4], "1cdf152366cae15536b8d9b5f6a2967c107ca88ce37ca685af5f1ce2b9f7baaa"],
+  [files[3], "52e663f56daba68fb7a38a3be11186acde0516dd82c97b52c0352ec7c535816f"],
+  [files[4], "19ad9b022484985e7d6be110c3d2814855068c6ae020c6c2b83574c35ab63199"],
 ]);
 
 for (const file of files) {
@@ -50,7 +50,7 @@ const result = spawnSync("gh", [
   ...files,
   "--repo", "skilesare/neutron",
   "--target", target,
-  "--title", "Rendezvous 0.3.0 — Neutron hackathon candidate",
+  "--title", "Rendezvous 0.3.1 — Neutron hackathon candidate",
   "--notes-file", "submission/RELEASE_NOTES.md",
 ], {cwd: root, stdio: "inherit"});
 if (result.status !== 0) process.exit(result.status ?? 1);

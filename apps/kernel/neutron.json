@@ -2,7 +2,7 @@
   "format": 3,
   "id": "kernel",
   "name": "Neutron",
-  "version": 313,
+  "version": 317,
   "update_source": "233tv-xiaaa-aaaay-aacta-cai",
   "src": "main.mo",
   "init_arg": [
@@ -13,6 +13,10 @@
     "canister_principal"
   ],
   "func": {
+    "capability_authority_revision": {
+      "type": "internal",
+      "async": false
+    },
     "kernel_authorized_add": {
       "type": "update",
       "async": false
@@ -165,20 +169,6 @@
       "async": false
     },
     "kernel_capability_set_enabled": {
-      "type": "update",
-      "async": false,
-      "arg": [
-        "caller"
-      ]
-    },
-    "kernel_media_session_begin": {
-      "type": "update",
-      "async": "async*",
-      "arg": [
-        "caller"
-      ]
-    },
-    "kernel_media_session_close": {
       "type": "update",
       "async": false,
       "arg": [
@@ -391,22 +381,12 @@
   },
   "memory": {
     "kernel": {
-      "version": 4,
+      "version": 3,
       "schemas": {
         "3": {
           "src": "memory/kernel/v3.mo"
-        },
-        "4": {
-          "src": "memory/kernel/v4.mo"
         }
-      },
-      "migrations": [
-        {
-          "from": 3,
-          "to": 4,
-          "src": "memory/kernel/v3_to_v4.mo"
-        }
-      ]
+      }
     },
     "kernel_activation": {
       "version": 1,
