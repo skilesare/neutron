@@ -18,11 +18,17 @@ immutable public cache policy. Exact esbuild-hashed JavaScript and CSS outputs
 under `/chunks/` receive the same policy; mutable metadata is revalidated with
 `no-cache`. The browser and CLI use normal
 HTTP fetches for asset bodies, while the authorization-protected
-`kernel_static_query` remains only for listing `/mo/` keys. Every other
-`/system/**` path remains HTTP-internal; this includes in-flight install data
-under `/system/staging/`.
+`kernel_static_query` remains a bounded key-list operation used for compiler
+module discovery and trusted frontend app-scoped artifact inventory. Every
+other `/system/**` path remains HTTP-internal; this includes in-flight install
+data under `/system/staging/`.
 Package/compiler proofs work across gateway authorities; executable web assets
 and app routes remain bound to their exact `Host`.
+
+The browser frontend also provides direct-Agent-only, read-only inspection of
+catalogued installed artifacts without adding a backend API or state schema.
+See [Kernel-App Communication](../../doc/kernel-app-communication.md#exact-installed-artifact-inspection)
+and [Kernel Frontend Runtime](../../doc/kernel-frontend-runtime.md#exact-installed-artifact-inspection).
 
 Kernel-authorized principals are never request-rate-limited or counted. Fixed-
 hour request windows protect only callers outside that set on declared public-
@@ -105,11 +111,13 @@ Kernel Settings keeps per-app operational information in the **Installed
 Apps** table rather than separate usage and update sections. Each row shows the
 app name and one-line description, cycles used, cycles in, update state or
 action from the latest Settings refresh, installed semantic version, details
-control, and uninstall control. Opening Settings checks update sources
-automatically; its global refresh action refreshes them again. When multiple
-verified releases are available, **Upgrade all** downloads and verifies the
-complete set, compiles it once, shows one combined approval review, and commits
-it through one checked installation transaction. The cycles-used cell is a
+control, and app-selection control. Selecting rows replaces the bulk update
+control with **Delete selected** and **Update selected**; deletion and selected
+updates each compile, review, and commit the complete selected set atomically.
+The launcher never exposes app deletion. Opening Settings checks update sources
+automatically; its global refresh action refreshes them again. With no rows
+selected, **Upgrade all** remains available for the complete verified update
+set. The cycles-used cell is a
 low-side 13-node pricing estimate: installation-lifetime instructions cost one
 cycle each, each measured update execution adds the 5,000,000-cycle execution
 base, authorized and direct-authenticated-ingress updates add the
