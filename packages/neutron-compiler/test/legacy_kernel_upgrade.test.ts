@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
 import {
   LEGACY_KERNEL_RELEASES,
+  RETAINED_KERNEL_V321_RELEASE,
   TEST_CANDIDATE_KERNEL_VERSION,
   compileFinalCandidateLegacyKernelUpgradeFixture,
+  compileFinalCandidateRetainedKernelUpgradeFixture,
   compileLegacyKernelUpgradeFixture,
   loadLegacyKernelIdentityFixture,
 } from "./legacy_kernel_upgrade_fixture.ts";
@@ -22,6 +24,29 @@ for (const release of LEGACY_KERNEL_RELEASES) {
 test("the final candidate lane requires an externally reviewed archive digest", async () => {
   await expect(
     compileFinalCandidateLegacyKernelUpgradeFixture({ expectedSha256: "" }),
+  ).rejects.toThrow(
+    "NEUTRON_FINAL_KERNEL_CANDIDATE_SHA256 must be a reviewed lowercase SHA-256",
+  );
+});
+
+test("the retained v0.3.21 predecessor is final-candidate-only and identity-bound", () => {
+  expect(LEGACY_KERNEL_RELEASES.map(({ version }) => version)).not.toContain(
+    RETAINED_KERNEL_V321_RELEASE.version,
+  );
+  expect(RETAINED_KERNEL_V321_RELEASE).toMatchObject({
+    label: "v0.3.21",
+    version: 321,
+    bytes: 2_411_860,
+    sha256: "1143b525ce869cae6c44297ec973b56bec06e2250a0885bca12ca87e030c999e",
+    persistenceMode: "classical",
+  });
+});
+
+test("the retained predecessor lane also requires the reviewed candidate digest", async () => {
+  await expect(
+    compileFinalCandidateRetainedKernelUpgradeFixture({
+      expectedSha256: "",
+    }),
   ).rejects.toThrow(
     "NEUTRON_FINAL_KERNEL_CANDIDATE_SHA256 must be a reviewed lowercase SHA-256",
   );

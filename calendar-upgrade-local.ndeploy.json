@@ -12,7 +12,7 @@
   },
   "artifacts": {
     "kind": "inline",
-    "kernel": { "path": "apps/kernel/kernel.v0.3.17.neutron" },
+    "kernel": { "path": "apps/kernel/kernel.v0.3.22.neutron" },
     "packages": [
       { "path": "apps/calendar/calendar.v0.1.0.neutron" }
     ]

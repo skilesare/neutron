@@ -4,6 +4,11 @@ Rendezvous is the Neutron hackathon entry. Contacts and Calendar are app
 dependencies. Direct calls use the owner's upstream Kernel 0.3.17 release; no
 custom Kernel fork is required.
 
+The live `rendezvous-hackathon` branch has since merged upstream Kernel 0.3.22
+and its current developer tooling. The immutable `rendezvous-v0.3.1` release
+below remains the exact reviewed submission kit built against Kernel 0.3.17;
+Rendezvous's declared tile permission remains compatible with Kernel 0.3.22.
+
 ## Submission copy
 
 **Title:** Rendezvous

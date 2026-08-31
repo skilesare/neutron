@@ -1,8 +1,8 @@
 # Rendezvous — LLM implementation workplan
 
 Status: submission candidate automation and human review (2026-08-21)
-Target: Neutron format-3 apps, upstream Kernel 0.3.17, Calendar 0.2.0, and Rendezvous 0.3.1
-Deliverables: upstream Kernel 0.3.17, Contacts 0.3.1, Calendar 0.2.0, Rendezvous 0.3.1, screenshots, demo video, release automation, and assisted portal resubmission
+Target: Neutron format-3 apps, current upstream Kernel 0.3.22, Calendar 0.2.0, and Rendezvous 0.3.1
+Deliverables: current source on Kernel 0.3.22; immutable published candidate kit on Kernel 0.3.17 with Contacts 0.3.1, Calendar 0.2.0, Rendezvous 0.3.1, screenshots, demo video, release automation, and assisted portal resubmission
 Upstream platform: https://github.com/infu/neutron
 
 ## 0. Product reset: from protocol demo to useful calendar
