@@ -120,10 +120,14 @@ function agentSnapshot(): AgentSnapshot {
   return {
     ready: true,
     connected: true,
+    webToolsAvailable: true,
     selectedModelId: "provider/model",
     models: [],
     modelsLoading: false,
     generating: false,
+    generatingHere: false,
+    conversationRevision: "0:0:-",
+    hiddenMessageCount: 0,
     messages: [],
     error: null,
   };
