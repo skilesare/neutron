@@ -1,10 +1,11 @@
-import { exposeTool, isJsonObject, querySelf, updateSelf, type ExposedToolOptions, type JsonObject, type JsonValue, type MsgBusToolHandler } from "neutron-tools/app";
+import { exposeTool, isJsonObject, onAppStateChange, querySelf, setTrayState, updateSelf, type ExposedToolOptions, type JsonObject, type JsonValue, type MsgBusToolHandler } from "neutron-tools/app";
 import { exposeAttachmentTool } from "neutron-tools/src/app_attachments.js";
 import { formatInstantForEditor, isValidTimeZone } from "./time_zone";
 import { parseIcsFileInWorker } from "./ics_import_client";
 import { buildImportPreview, bytesHex, importPreviewDigest, importSeriesWire, type ImportIndexEntry, type ImportPreview } from "./ics_import_preview";
 import { materializeRecurrence, type RecurrenceDraft, type RepeatFrequency } from "./recurrence";
 import { encodeCalendarSearchWire } from "./search_wire";
+import { nextReminderWakeAt, parseReminderSchedule, projectReminderSnapshot, REMINDER_GRACE_MS, REMINDER_LOOKAHEAD_MS, REMINDER_RECOVERY_POLL_MS, type ReminderSnapshot } from "./reminders";
 
 const QUERY_TIMEOUT = 30;
 const WRITE_TIMEOUT = 45;
@@ -174,6 +175,52 @@ registerTool("commit_ics_import", {
 registerTool("ics_import_status", {
   title: "iCalendar Import Status", description: "Reconcile an iCalendar import by the batch ID and preview digest returned from commit_ics_import.", inputSchema: objectSchema(["batchId", "previewDigest"], { batchId: { type: "string", pattern: "^[a-f0-9]{32,64}$" }, previewDigest: { type: "string", pattern: "^[a-f0-9]{64}$" } }), outputSchema: { type: "object" }, annotations: { "neutron:effects": ["read"] },
 }, async (args, context) => context.kernel.querySelf<JsonValue>("calendar_bulk_status_v1", [{ batch_id: parseHex(requiredText(args.batchId, "batchId")), preview_digest: parseHex(requiredText(args.previewDigest, "previewDigest")) }], QUERY_TIMEOUT));
+
+let reminderSnapshot: ReminderSnapshot = projectReminderSnapshot({ revision: "0", total: 0, items: [] }, Date.now(), Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+let reminderTimer: number | null = null;
+let reminderRefreshPromise: Promise<void> | null = null;
+let reminderBadge: number | null = null;
+
+registerTool("reminder_snapshot", {
+  title: "Read Calendar Reminder Tray", description: "Read the compact owner-facing reminder projection used by the Calendar tray. It contains event titles and times, but never notes or locations.",
+  inputSchema: objectSchema([], {}), outputSchema: { type: "object" }, annotations: { "neutron:effects": ["read"] },
+}, async () => { await refreshReminders(); return reminderSnapshot as unknown as JsonObject; });
+
+async function refreshReminders(): Promise<void> {
+  if (reminderRefreshPromise) return reminderRefreshPromise;
+  const running = (async () => {
+    try {
+      const now = Date.now();
+      const preferences = record(await querySelf<JsonValue>("calendar_preferences_get", [null], QUERY_TIMEOUT), "Calendar preferences");
+      const timeZone = text(preferences.display_time_zone, "time zone");
+      const raw = await querySelf<JsonValue>("calendar_reminder_schedule_v1", [{ due_start_ns: String(BigInt(now - REMINDER_GRACE_MS) * 1_000_000n), due_end_ns: String(BigInt(now + REMINDER_LOOKAHEAD_MS) * 1_000_000n), limit: "200" }], QUERY_TIMEOUT);
+      const schedule = parseReminderSchedule(raw); const projected = projectReminderSnapshot(schedule, now, timeZone);
+      reminderSnapshot = { ...projected, lifecycle: `${projected.lifecycle} Loaded ${schedule.items.length} of ${schedule.total} scheduled reminders.` };
+      const badge = reminderSnapshot.badge > 0 ? reminderSnapshot.badge : null;
+      if (badge !== reminderBadge) { await setTrayState({ badge }); reminderBadge = badge; }
+    } catch (error) {
+      // Preserve the last authoritative projection and badge during transient failures,
+      // while giving the owner a bounded diagnostic in the private tray.
+      const detail = (error instanceof Error ? error.message : String(error)).replaceAll(/\s+/gu, " ").slice(0, 180);
+      reminderSnapshot = { ...reminderSnapshot, lifecycle: `Reminder refresh is temporarily unavailable. ${detail}` };
+    } finally { scheduleReminderRefresh(); }
+  })();
+  reminderRefreshPromise = running;
+  try { await running; } finally { if (reminderRefreshPromise === running) reminderRefreshPromise = null; }
+}
+
+function scheduleReminderRefresh(): void {
+  if (reminderTimer !== null) window.clearTimeout(reminderTimer);
+  const delay = Math.max(250, Math.min(REMINDER_RECOVERY_POLL_MS, nextReminderWakeAt(reminderSnapshot, Date.now()) - Date.now()));
+  reminderTimer = window.setTimeout(() => { reminderTimer = null; void refreshReminders(); }, delay);
+}
+
+if (typeof window !== "undefined") {
+  onAppStateChange("calendar", () => void refreshReminders());
+  window.addEventListener("online", () => void refreshReminders());
+  window.addEventListener("pageshow", () => void refreshReminders());
+  void refreshReminders();
+}
 
 registerTool("undo_ics_import", {
   title: "Undo iCalendar Import", description: "Undo one committed import only if no affected series has been edited since. Calendar refuses rather than overwrite later owner changes.", inputSchema: objectSchema(["batchId", "previewDigest"], { batchId: { type: "string", pattern: "^[a-f0-9]{32,64}$" }, previewDigest: { type: "string", pattern: "^[a-f0-9]{64}$" } }), outputSchema: { type: "object" }, annotations: { "neutron:effects": ["write"] },

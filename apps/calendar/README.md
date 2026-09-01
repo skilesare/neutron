@@ -120,6 +120,30 @@ raw file contents, notes, locations, unrelated events, batch bytes, and private
 Calendar storage are not placed in model text. Preview tokens expire after ten
 minutes.
 
+## Resident reminders and tray
+
+Each series can have one reminder from the event time through seven days
+before it. A recurring occurrence can inherit that series reminder or replace
+it with its own offset. Confirmed Rendezvous meetings are read-only as events,
+but the owner can still attach a local Calendar reminder. Reminder records stay
+in Calendar's existing schema-v4 memory and are removed with their occurrence
+or series.
+
+The background reads a bounded seven-day due window and maintains one
+coalesced browser timer plus a one-minute recovery poll. It recomputes after
+startup, page resume, connectivity recovery, Calendar revision invalidation,
+and saved-time-zone changes. A reminder is actionable only from its due time
+through a 15-minute grace window, preventing a long-suspended browser from
+emitting a catch-up storm. The tray badge is capped at 99 and its projection
+contains only event title, source, status, time, and offset—never notes or
+location. Tray sections show Now, Next, and Today, and an item opens that exact
+Calendar occurrence.
+
+These are browser-resident tray reminders, not push notifications. Nothing
+fires while the Neutron is closed or its background is unavailable. On restart,
+Calendar reconstructs the schedule from durable reminders and only catches up
+inside the documented grace window.
+
 Key bounds: 2,000 stored occurrences, 730 occurrences/series, 100 search
 results/page, 2,000 scanned occurrences/search call, 32 availability
 candidates/request, 15–480 minute meetings, a 31-day availability horizon,
@@ -134,4 +158,4 @@ npm --workspace neutron-calendar test
 
 The package pipeline validates, builds, locks managed memory, creates method
 schemas, runs recurrence/domain/migration suites, and produces
-`apps/calendar/calendar.v0.5.0.neutron`.
+`apps/calendar/calendar.v0.6.5.neutron`.

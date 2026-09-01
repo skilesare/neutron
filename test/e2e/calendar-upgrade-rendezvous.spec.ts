@@ -9,9 +9,9 @@ import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
 const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "rendezvous-local.ndeploy.json";
-const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.5.0.neutron");
+const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.5.neutron");
 
-test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.5.0", async ({ browser }) => {
+test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.6.5", async ({ browser }) => {
   test.setTimeout(360_000);
   const aliceRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
   const bobRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 1 });
@@ -55,7 +55,7 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     await bob.page.reload({ waitUntil: "domcontentloaded" });
     const afterRuntime = await actor.kernel_runtime_info();
     const afterApp = afterRuntime.apps.find((app) => app.scope.app_id === "calendar");
-    expect(Number(afterApp?.version)).toBe(500);
+    expect(Number(afterApp?.version)).toBe(605);
     const afterCalendarMemory = afterRuntime.memories.find((memory) => memory.id === "calendar");
     expect(Number(afterCalendarMemory?.version)).toBe(4);
     expect(String(afterApp?.scope.installation_uid)).toBe(String(beforeApp?.scope.installation_uid));

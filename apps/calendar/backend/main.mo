@@ -16,6 +16,7 @@ import Validation "Validation";
 module {
     let MAX_SERIES = 2_000; let MAX_OCCURRENCES = 10_000; let MAX_SERIES_OCCURRENCES = 730; let MAX_RANGE_RESULTS = 2_000; let MAX_SEARCH_SCAN = 2_000;
     let MAX_IMPORT_SERIES = 250; let MAX_IMPORT_OCCURRENCES = 2_000; let MAX_BULK_RECEIPTS = 20; let MAX_BULK_RECEIPT_BYTES = 2_000_000;
+    let MAX_REMINDERS = 4_000; let MAX_REMINDER_RESULTS = 200; let MAX_REMINDER_OFFSET_MINUTES : Nat32 = 10_080;
     public type Status = { revision : Nat64; event_count : Nat };
     public type Error = { code : Text; message : Text; revision : Nat64 };
     public type EventView = { id : Nat64; revision : Nat64; start_ns : Nat64; end_ns : Nat64; title : Text; notes : Text; source : Text; status : Text; hold_expires_at_ns : ?Nat64 };
@@ -70,6 +71,14 @@ module {
     public type BulkStatusResultV1 = { #committed : BulkReceiptViewV1; #not_found : { revision : Nat64 }; #digest_mismatch : { revision : Nat64 } };
     public type BulkUndoRequestV1 = { batch_id : Blob; preview_digest : Blob };
     public type BulkUndoResultV1 = { #undone : { revision : Nat64 }; #already_undone : { revision : Nat64 }; #err : Error };
+
+    public type ReminderGetRequestV1 = { series_id : Nat64; occurrence_id : ?Nat64 };
+    public type ReminderViewV1 = { revision : Nat64; calendar_revision : Nat64; series_id : Nat64; occurrence_id : ?Nat64; offset_minutes : ?Nat32; inherited : Bool };
+    public type ReminderSetRequestV1 = { series_id : Nat64; occurrence_id : ?Nat64; expected_series_revision : Nat64; offset_minutes : ?Nat32 };
+    public type ReminderResultV1 = { #ok : ReminderViewV1; #err : Error };
+    public type ReminderScheduleRequestV1 = { due_start_ns : Nat64; due_end_ns : Nat64; limit : Nat };
+    public type ReminderOccurrenceV1 = { occurrence : OccurrenceView; due_at_ns : Nat64; offset_minutes : Nat32 };
+    public type ReminderScheduleV1 = { revision : Nat64; total : Nat; reminders : [ReminderOccurrenceV1] };
 
     public type AvailabilityRequestV1 = { window_start_ns : Nat64; window_end_ns : Nat64; duration_minutes : Nat32; candidate_starts_ns : [Nat64] };
     public type AvailabilityResultV1 = { revision : Nat64; available_starts_ns : [Nat64] };
@@ -165,6 +174,68 @@ module {
                 }
             };
             { revision = mem.revision; entries }
+        };
+
+        public func /*query*/calendar_reminder_get_v1(request : ReminderGetRequestV1) : ?ReminderViewV1 {
+            let ?(_, series) = findSeries(request.series_id) else return null;
+            switch (request.occurrence_id) {
+                case (?occurrenceId) {
+                    let ?(_, occurrence) = findOccurrence(occurrenceId) else return null;
+                    if (occurrence.series_id != series.id) return null;
+                    switch (findReminder(series.id, ?occurrenceId)) {
+                        case (?reminder) ?reminderView(series, ?occurrenceId, ?reminder.offset_minutes, false);
+                        case null switch (findReminder(series.id, null)) {
+                            case (?reminder) ?reminderView(series, ?occurrenceId, ?reminder.offset_minutes, true);
+                            case null ?reminderView(series, ?occurrenceId, null, false);
+                        };
+                    }
+                };
+                case null switch (findReminder(series.id, null)) {
+                    case (?reminder) ?reminderView(series, null, ?reminder.offset_minutes, false);
+                    case null ?reminderView(series, null, null, false);
+                };
+            }
+        };
+        public func /*query*/calendar_reminder_schedule_v1(request : ReminderScheduleRequestV1) : ReminderScheduleV1 {
+            if (request.due_start_ns >= request.due_end_ns) return { revision = mem.revision; total = 0; reminders = [] };
+            var values : [ReminderOccurrenceV1] = [];
+            for (occurrence in mem.occurrences.vals()) {
+                switch (occurrence.status) {
+                    case (#cancelled or #hold(_)) {};
+                    case (_) switch (effectiveReminder(occurrence)) {
+                        case (?offset) {
+                            let delta = Nat64.fromNat(Nat32.toNat(offset)) * 60_000_000_000;
+                            if (occurrence.start_ns >= delta) {
+                                let due = occurrence.start_ns - delta;
+                                if (due >= request.due_start_ns and due < request.due_end_ns) values := Array.concat(values, [{ occurrence = occurrenceView(occurrence); due_at_ns = due; offset_minutes = offset }]);
+                            }
+                        };
+                        case null {};
+                    };
+                }
+            };
+            let sorted = Array.sort<ReminderOccurrenceV1>(values, func(left, right) { Nat64.compare(left.due_at_ns, right.due_at_ns) });
+            let (_, finish) = bounds(0, request.limit, sorted.size(), MAX_REMINDER_RESULTS);
+            { revision = mem.revision; total = sorted.size(); reminders = Array.tabulate<ReminderOccurrenceV1>(finish, func(index) { sorted[index] }) }
+        };
+        public func /*update*/calendar_reminder_set_v1(request : ReminderSetRequestV1) : ReminderResultV1 {
+            let ?(seriesIndex, series) = findSeries(request.series_id) else return #err(error("not_found", "Series not found", mem.revision));
+            if (series.revision != request.expected_series_revision) return #err(error("stale", "Series changed", mem.revision));
+            switch (request.occurrence_id) {
+                case (?occurrenceId) {
+                    let ?(_, occurrence) = findOccurrence(occurrenceId) else return #err(error("not_found", "Occurrence not found", mem.revision));
+                    if (occurrence.series_id != series.id) return #err(error("invalid", "Occurrence does not belong to this series", mem.revision));
+                };
+                case null {};
+            };
+            switch (request.offset_minutes) { case (?offset) if (offset > MAX_REMINDER_OFFSET_MINUTES) return #err(error("invalid", "Reminder must be between event time and seven days before", mem.revision)); case (_) {} };
+            let existing = findReminder(series.id, request.occurrence_id);
+            if (existing == null and request.offset_minutes != null and mem.reminders.size() >= MAX_REMINDERS) return #err(error("full", "Reminder capacity reached", mem.revision));
+            mem.reminders := Array.filter<Memory.Reminder>(mem.reminders, func(item) { not reminderKeyMatches(item, series.id, request.occurrence_id) });
+            switch (request.offset_minutes) { case (?offset) mem.reminders := Array.concat(mem.reminders, [{ series_id = series.id; occurrence_id = request.occurrence_id; offset_minutes = offset }]); case null {} };
+            let updated = { series with revision = series.revision + 1; updated_at_ns = nowNs() };
+            mem.series := replaceAt(mem.series, seriesIndex, updated); mem.revision += 1;
+            #ok(reminderView(updated, request.occurrence_id, request.offset_minutes, false))
         };
 
         public func /*update*/calendar_import_commit_v1(request : ImportCommitRequestV1) : ImportCommitResultV1 {
@@ -307,7 +378,12 @@ module {
             let updated : Memory.EventSeries = { current with revision = current.revision + 1; title = request.value.title; notes = request.value.notes; location = request.value.location; color = request.value.color; availability = request.value.availability; kind = request.value.kind; time_zone = request.value.time_zone; recurrence = request.value.recurrence; updated_at_ns = nowNs() };
             mem.series := replaceAt(mem.series, index, updated);
             let other = Array.filter<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id != current.id });
-            mem.occurrences := Array.concat(other, materialize(current.id, request.value.occurrences, existing)); mem.revision += 1;
+            let nextOccurrences = materialize(current.id, request.value.occurrences, existing);
+            mem.occurrences := Array.concat(other, nextOccurrences);
+            mem.reminders := Array.filter<Memory.Reminder>(mem.reminders, func(reminder) {
+                reminder.series_id != current.id or reminder.occurrence_id == null or Array.any<Memory.Occurrence>(nextOccurrences, func(item) { reminder.occurrence_id == ?item.id })
+            });
+            mem.revision += 1;
             #ok(seriesView(updated))
         };
         public func /*update*/calendar_series_remove_v2(request : SeriesRemoveRequest) : MutationResult {
@@ -344,7 +420,9 @@ module {
             if (owner.source != #owner) return #err(error("forbidden", "Rendezvous occurrence cannot be deleted here", mem.revision));
             let ?(seriesIndex, series) = findSeries(current.series_id) else return #err(error("corrupt", "Series missing", mem.revision));
             mem.series := replaceAt(mem.series, seriesIndex, { series with revision = series.revision + 1; updated_at_ns = nowNs() });
-            mem.occurrences := replaceAt(mem.occurrences, index, { current with revision = current.revision + 1; status = #cancelled }); mem.revision += 1; #ok({ revision = mem.revision })
+            mem.occurrences := replaceAt(mem.occurrences, index, { current with revision = current.revision + 1; status = #cancelled });
+            mem.reminders := Array.filter<Memory.Reminder>(mem.reminders, func(item) { item.occurrence_id != ?current.id });
+            mem.revision += 1; #ok({ revision = mem.revision })
         };
 
         public func /*update*/calendar_create(request : CreateRequest) : EventResult {
@@ -370,6 +448,7 @@ module {
             let ?(index, current) = findOccurrence(request.id) else return #err(error("not_found", "Event not found", mem.revision));
             if (current.revision != request.expected_event_revision) return #err(error("stale", "Event changed", mem.revision));
             mem.occurrences := removeAt(mem.occurrences, index);
+            mem.reminders := Array.filter<Memory.Reminder>(mem.reminders, func(item) { item.occurrence_id != ?current.id });
             if (not Array.any<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id == current.series_id })) { mem.series := Array.filter<Memory.EventSeries>(mem.series, func(item) { item.id != current.series_id }); mem.import_provenance := Array.filter<Memory.ImportProvenance>(mem.import_provenance, func(item) { item.series_id != current.series_id }); mem.reminders := Array.filter<Memory.Reminder>(mem.reminders, func(item) { item.series_id != current.series_id }) };
             mem.revision += 1; #ok({ revision = mem.revision })
         };
@@ -571,6 +650,12 @@ module {
         func activeOccurrences() : [Memory.Occurrence] { let now = nowNs(); Array.filter<Memory.Occurrence>(mem.occurrences, func(item) { switch (item.status) { case (#cancelled) false; case (#hold(expires)) expires > now; case (_) true } }) };
         func findSeries(id : Nat64) : ?(Nat, Memory.EventSeries) { var index = 0; while (index < mem.series.size()) { if (mem.series[index].id == id) return ?(index, mem.series[index]); index += 1 }; null };
         func findOccurrence(id : Nat64) : ?(Nat, Memory.Occurrence) { var index = 0; while (index < mem.occurrences.size()) { if (mem.occurrences[index].id == id) return ?(index, mem.occurrences[index]); index += 1 }; null };
+        func reminderKeyMatches(item : Memory.Reminder, seriesId : Nat64, occurrenceId : ?Nat64) : Bool { item.series_id == seriesId and item.occurrence_id == occurrenceId };
+        func findReminder(seriesId : Nat64, occurrenceId : ?Nat64) : ?Memory.Reminder { Array.find<Memory.Reminder>(mem.reminders, func(item) { reminderKeyMatches(item, seriesId, occurrenceId) }) };
+        func effectiveReminder(occurrence : Memory.Occurrence) : ?Nat32 {
+            switch (findReminder(occurrence.series_id, ?occurrence.id)) { case (?item) ?item.offset_minutes; case null switch (findReminder(occurrence.series_id, null)) { case (?item) ?item.offset_minutes; case null null } }
+        };
+        func reminderView(series : Memory.EventSeries, occurrenceId : ?Nat64, offset : ?Nat32, inherited : Bool) : ReminderViewV1 { { revision = series.revision; calendar_revision = mem.revision; series_id = series.id; occurrence_id = occurrenceId; offset_minutes = offset; inherited } };
         func findExternal(id : Blob) : ?(Nat, Nat, Memory.Occurrence) { var seriesIndex = 0; while (seriesIndex < mem.series.size()) { switch (mem.series[seriesIndex].source) { case (#rendezvous(value)) if (value == id) { var occurrenceIndex = 0; while (occurrenceIndex < mem.occurrences.size()) { if (mem.occurrences[occurrenceIndex].series_id == mem.series[seriesIndex].id) return ?(seriesIndex, occurrenceIndex, mem.occurrences[occurrenceIndex]); occurrenceIndex += 1 } }; case (_) {} }; seriesIndex += 1 }; null };
         func materialize(seriesId : Nat64, inputs : [OccurrenceInput], existing : [Memory.Occurrence]) : [Memory.Occurrence] {
             Array.map<OccurrenceInput, Memory.Occurrence>(inputs, func(input) {
@@ -640,6 +725,15 @@ public type calendar_search_v1_Output = SearchResultV1;
 
 public type calendar_import_index_v1_Input = (request : ImportIndexRequestV1);
 public type calendar_import_index_v1_Output = ImportIndexV1;
+
+public type calendar_reminder_get_v1_Input = (request : ReminderGetRequestV1);
+public type calendar_reminder_get_v1_Output = ?ReminderViewV1;
+
+public type calendar_reminder_schedule_v1_Input = (request : ReminderScheduleRequestV1);
+public type calendar_reminder_schedule_v1_Output = ReminderScheduleV1;
+
+public type calendar_reminder_set_v1_Input = (request : ReminderSetRequestV1);
+public type calendar_reminder_set_v1_Output = ReminderResultV1;
 
 public type calendar_import_commit_v1_Input = (request : ImportCommitRequestV1);
 public type calendar_import_commit_v1_Output = ImportCommitResultV1;

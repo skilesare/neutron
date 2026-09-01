@@ -1,0 +1,25 @@
+@use "neutron-design-system/styles.scss";
+
+@layer app {
+  html, body, #root { height: 100%; margin: 0; overflow: hidden; width: 100%; }
+  .calendar-tray { background: var(--nt-bg, #0b0d10); color: var(--nt-text, #f3f5f4); display: flex; flex-direction: column; font-family: var(--nt-font-ui, system-ui, sans-serif); font-size: 13px; height: 100%; }
+  .calendar-tray * { box-sizing: border-box; }
+  .calendar-tray header { align-items: center; border-bottom: 1px solid var(--nt-line-subtle, #28302e); display: flex; justify-content: space-between; padding: 10px 12px; }
+  .calendar-tray h1 { font-size: 15px; margin: 1px 0 0; }
+  .calendar-tray .eyebrow { color: var(--nt-text-muted, #99a4a0); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+  .calendar-tray header button { background: transparent; border: 1px solid var(--nt-line-subtle, #34403c); border-radius: 7px; color: inherit; cursor: pointer; font: inherit; padding: 6px 9px; }
+  .tray-sections { flex: 1; min-height: 0; overflow-y: auto; }
+  .calendar-tray section { border-bottom: 1px solid var(--nt-line-subtle, #28302e); }
+  .calendar-tray h2 { color: var(--nt-text-muted, #99a4a0); font-size: 10px; letter-spacing: .08em; margin: 0; padding: 9px 12px 4px; text-transform: uppercase; }
+  .calendar-tray ol { list-style: none; margin: 0; padding: 0; }
+  .calendar-tray li button { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: flex; font: inherit; gap: 10px; justify-content: space-between; padding: 9px 12px; text-align: left; width: 100%; }
+  .calendar-tray li button:hover { background: var(--nt-bg-panel, #151a18); }
+  .calendar-tray li button:focus-visible, .calendar-tray header button:focus-visible { outline: 2px solid var(--nt-line-focus, #8bd9ce); outline-offset: -2px; }
+  .calendar-tray li span { display: flex; flex-direction: column; min-width: 0; }
+  .calendar-tray li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .calendar-tray li small, .calendar-tray time, .calendar-tray footer { color: var(--nt-text-muted, #99a4a0); }
+  .calendar-tray time { flex: none; font-variant-numeric: tabular-nums; }
+  .tray-state { color: var(--nt-text-muted, #99a4a0); flex: 1; margin: 0; padding: 18px 12px; }
+  .tray-state--error { color: #e9bf73; }
+  .calendar-tray footer { border-top: 1px solid var(--nt-line-subtle, #28302e); font-size: 10px; line-height: 1.4; padding: 8px 12px; }
+}

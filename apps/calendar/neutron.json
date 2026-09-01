@@ -2,13 +2,18 @@
   "format": 3,
   "name": "Calendar",
   "id": "calendar",
-  "version": 500,
+  "version": 605,
   "update_source": "233tv-xiaaa-aaaay-aacta-cai",
   "description": "Private calendar and local availability for installed Neutron apps",
   "src": "main.mo",
   "background": {
     "path": "service.html",
     "description": "Calendar tools for the owner and Neutron Agent"
+  },
+  "tray": {
+    "title": "Calendar",
+    "path": "tray.html",
+    "icon": "static/icon.png"
   },
   "tiles": [
     {
@@ -29,6 +34,9 @@
         "calendar_export_v1",
         "calendar_search_v1",
         "calendar_import_index_v1",
+        "calendar_reminder_get_v1",
+        "calendar_reminder_schedule_v1",
+        "calendar_reminder_set_v1",
         "calendar_import_commit_v1",
         "calendar_bulk_status_v1",
         "calendar_bulk_undo_v1",
@@ -77,6 +85,18 @@
     },
     "calendar_import_index_v1": {
       "type": "query",
+      "async": false
+    },
+    "calendar_reminder_get_v1": {
+      "type": "query",
+      "async": false
+    },
+    "calendar_reminder_schedule_v1": {
+      "type": "query",
+      "async": false
+    },
+    "calendar_reminder_set_v1": {
+      "type": "update",
       "async": false
     },
     "calendar_import_commit_v1": {

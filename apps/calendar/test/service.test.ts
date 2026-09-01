@@ -5,7 +5,7 @@ import { calendarToolHandlers } from "../src/service";
 const tools = listExposedTools();
 
 test("Calendar exposes the complete bounded semantic tool surface", () => {
-  expect(tools.map((tool) => tool.name).sort()).toEqual(["commit_ics_import", "create_event", "delete_event", "export_event", "find_free_time", "get_event", "ics_import_status", "list_schedule", "preview_ics_import", "search_events", "status", "undo_ics_import", "update_event"]);
+  expect(tools.map((tool) => tool.name).sort()).toEqual(["commit_ics_import", "create_event", "delete_event", "export_event", "find_free_time", "get_event", "ics_import_status", "list_schedule", "preview_ics_import", "reminder_snapshot", "search_events", "status", "undo_ics_import", "update_event"]);
   for (const tool of tools) {
     expect(tool.inputSchema).toMatchObject({ type: "object", additionalProperties: false });
     expect(tool.outputSchema).toBeDefined();

@@ -1,5 +1,25 @@
 # Calendar release notes
 
+## 0.6.5 — unpublished candidate
+
+- Adds durable zero-or-one reminder offsets for a series or individual
+  occurrence using the existing schema-v4 reminder collection; no new memory
+  schema or migration is introduced.
+- Adds a browser-resident scheduler with bounded seven-day reads, coalesced
+  timers, a 15-minute missed-reminder grace window, revision invalidation, and
+  a capped actionable badge.
+- Adds the Calendar tray with keyboard-accessible Now, Next, and Today sections
+  plus exact-occurrence navigation back into Calendar.
+- Lets owners add local reminders to read-only confirmed Rendezvous meetings
+  without changing Rendezvous state or the Kernel.
+- States the lifecycle limitation directly: reminders do not fire while the
+  Neutron is closed or its background is unavailable.
+- Retains the locked schema-v4 and v3-to-v4 migration bytes from Calendar 0.5.0.
+
+Calendar 0.6.5 remains unpublished until the complete state-preserving upgrade,
+two-Neutron Rendezvous regression, browser acceptance, and owner authorization
+gates are complete.
+
 ## 0.5.0 — unpublished candidate
 
 - Adds bounded local `.ics` import in a killable worker with explicit preview
