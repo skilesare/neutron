@@ -10,7 +10,7 @@ import Nat64 "mo:core/Nat64";
 import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Availability "AvailabilityV2";
-import Memory "memory/calendar/v2";
+import Memory "memory/calendar/v3";
 import Validation "Validation";
 
 module {

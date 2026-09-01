@@ -1,6 +1,6 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0 implementation and automated qualification complete; manual Google/Outlook import and live Agent acceptance remain
+Status: P0 automated qualification and P1 Phase 5 memory migration complete; P1 ICS import is next; manual P0 interoperability/Agent acceptance remain release gates
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
@@ -493,30 +493,54 @@ P0 release-gate evidence (updated 2026-09-01):
 
 ## 12. Phase 5 — P1 memory schema v3 design and migration
 
-Do not begin P1 persistence changes until P0 is green.
+The owner directed P1 implementation to continue while the external/manual P0
+checks remain open. Those checks still block release; they do not idle local
+implementation and automated qualification.
 
-- [ ] Copy the immutable v2 types into a new
+- [x] Copy the immutable v2 types into a new
   `backend/memory/calendar/v3.mo`; never edit v2.
-- [ ] Add only fields required by accepted P1 features. Expected additions:
+- [x] Add only fields required by accepted P1 features. Expected additions:
   - import provenance: external UID, sequence, and last imported digest;
   - bounded reminder offsets;
   - subscription preference/status only if a separately installed feed
     companion is approved; that companion owns all locator, bearer, certified
     publication, and reconciliation state;
   - bounded bulk-operation/undo receipts.
-- [ ] Keep feed bearer material out of public views, logs, Agent results, and
+- [x] Keep feed bearer material out of public views, logs, Agent results, and
   exported ICS bodies.
-- [ ] Add `v2_to_v3.mo` with a deterministic bounded migration.
-- [ ] Existing series migrate with no import provenance, no reminders, feed
+- [x] Add `v2_to_v3.mo` with a deterministic bounded migration.
+- [x] Existing series migrate with no import provenance, no reminders, feed
   disabled, and an empty undo journal.
-- [ ] Add `2 -> 3` to `neutron.json`, update backend usage, and regenerate the
+- [x] Add `2 -> 3` to `neutron.json`, update backend usage, and regenerate the
   lock only through the normal package workflow.
-- [ ] Test clean v3 initialization, exact production v2 restoration followed by
+- [x] Test clean v3 initialization, exact production v2 restoration followed by
   migration, maximum-size representative migration, and semantic equality of
   every pre-existing event and preference.
 
 Exit gate: v2 data migrates exactly; feed is off by default; no v1/v2 source was
 modified.
+
+Phase 5 evidence (2026-09-01):
+
+- `v3.mo` preserves the complete v2 event/preference model and adds only
+  namespaced import provenance, one-offset reminder records, and bounded-shape
+  bulk undo receipts. No subscription locator, bearer token, or publisher state
+  is stored because no companion publisher has been approved.
+- `v2_to_v3.mo` transfers every existing field directly and initializes all
+  three P1 collections empty. Immutable v1, v2, and v1-to-v2 sources retain
+  their released hashes.
+- Generated schema v3 hash:
+  `837ec1952dd080b3fc418c2bbd332bb0d79f16345b2f02a97c60622f9530c916`;
+  migration 2-to-3 hash:
+  `2fdf59e28dfb0654092b452a495f24a1678b62a74d61059885a157abacda6818`.
+- The complete Calendar package/unit/domain suite passes, including clean v3,
+  representative semantic equality, and configured maximum-capacity migration
+  for 2,000 series and 10,000 occurrences.
+- The in-product Playwright upgrade from the exact 0.2.0 archive to 0.4.0 passed
+  in 30.1 seconds. It advanced Calendar memory v2 to v3 while retaining the
+  installation UID, non-Calendar memory inventory, timed/all-day data,
+  recurrence, exceptions, Busy/Free state, location, notes, and UTC instants.
+  Reinstall was used only to initialize the disposable 0.2.0 fixture.
 
 ## 13. Phase 6 — P1 ICS import, preview, atomic commit, and undo
 
