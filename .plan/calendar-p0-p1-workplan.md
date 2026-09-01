@@ -448,7 +448,7 @@ Phase 4 implementation evidence (automated portion, 2026-08-31):
   free, hold, and confirmed Rendezvous data.
 - [x] Verify upgrade does not alter stored data merely because the display
   timezone implementation changed.
-- [ ] Review the final `.neutron` archive, offered-source artifact, SHA-256, and
+- [x] Review the final `.neutron` archive, offered-source artifact, SHA-256, and
   size. Re-run from a clean checkout to test reproducibility where supported.
 - [ ] STOP before `npm run updates:publish`. Production publication requires an
   explicit owner decision and the complete `AGENTS.md` publish/no-op receipt
@@ -468,6 +468,11 @@ P0 release-gate evidence (updated 2026-09-01):
   The package record identifies Calendar version 300, production update source,
   use-only application license, unchanged Calendar v2 memory lineage, and the
   digest-addressed source offer.
+- A detached clean checkout of exact commit
+  `e96c1389d7be695fa41aa3ac6cf22c02fd87286a` was installed from
+  `package-lock.json` and packaged with the authoritative workspace command.
+  Its archive and offered-source artifact are byte-identical to the reviewed
+  main-checkout artifacts and reproduce the sizes and SHA-256 values above.
 - Clean installed-package `calendar-p0-gates.spec.ts`: 4 passed in 23.8s. It
   covers narrow keyboard create/search/edit, owner-approved Calendar-to-Files
   ICS save and content inspection, authorization removal/logout, and Calendar +
@@ -488,8 +493,7 @@ P0 release-gate evidence (updated 2026-09-01):
 - Disposable PocketIC fixtures alone use reinstall for clean initialization.
   The production-shaped upgrade uses the in-product update action and never
   reinstalls state. Manual Google/Outlook import, live owner-driven Agent checks,
-  final reproducibility review, commit/push, and explicit publication approval
-  remain. Nothing has been published.
+  and explicit publication approval remain. Nothing has been published.
 
 ## 12. Phase 5 — P1 memory schema v3 design and migration
 
