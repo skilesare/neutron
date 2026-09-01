@@ -1,0 +1,22 @@
+{
+  "format": 3,
+  "target": {
+    "kind": "pocketic",
+    "profile": "minimal",
+    "gateway_port": 8000,
+    "developer_identity_seed": 2,
+    "authorized_principals": [
+      "pbwxr-uqxlv-aiwi3-omw2n-ptdex-kyifb-kdsn6-zdiyd-ggzpu-nrzik-rqe"
+    ],
+    "nodes": ["calendar-demo"]
+  },
+  "artifacts": {
+    "kind": "inline",
+    "kernel": { "path": "apps/kernel/kernel.v0.3.22.neutron" },
+    "packages": [
+      { "path": "apps/calendar/calendar.v0.6.6.neutron" },
+      { "path": "apps/agent/agent.v0.3.9.neutron" },
+      { "path": "apps/vfs/files.v0.4.3.neutron" }
+    ]
+  }
+}

@@ -342,6 +342,10 @@ Phase 2 implementation evidence (automated portion, 2026-08-31):
   owner-approved write to optional Files, with an in-memory copy fallback.
   The browser test verifies the saved Files path and the actual ICS contents.
   Kernel remains unchanged.
+- `test/manual/calendar-0.6.6-acceptance.md` records the current official Google
+  Calendar and Outlook web import surfaces checked on 2026-09-01, the exact
+  shared `.ics`-bytes requirement, semantic checks, and evidence locations.
+  The credentialed provider results remain open until the owner-assisted run.
 
 ## 9. Phase 3 — P0 bounded backend search and UI filtering
 
@@ -425,8 +429,10 @@ Phase 3 implementation evidence (2026-08-31):
   - find an event;
   - web-search a public event, preview the exact proposed Calendar values, and
     add it only after owner intent is clear;
-  - deny an unrelated permission request;
-  - reconcile an injected ambiguous write failure.
+  - deny an unrelated permission request.
+- [x] Reconcile an injected ambiguous write failure through the deterministic
+  fake-driver qualification. Do not add a production fault-control surface only
+  to reproduce this manually.
 
 Exit gate: Agent can reliably inspect and mutate Calendar through semantic
 tools without being taught Calendar-specific logic inside Agent itself.
@@ -440,6 +446,9 @@ Phase 4 implementation evidence (automated portion, 2026-08-31):
 - Deterministic fake-model qualification creates and finds an event and proves
   an ambiguous write is reconciled without retry. Real Agent 0.3.9 interaction
   checks remain open because they require an owner-driven browser session.
+- `test/manual/calendar-0.6.6-acceptance.md` fixes the exact 0.6.6/Agent 0.3.9
+  fixture, live prompts, evidence filenames, owner-consent boundaries, and
+  authoritative Calendar reconciliation steps.
 
 ## 11. P0 release gate — Calendar 0.3.0
 
