@@ -5,7 +5,7 @@ import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Calendar "../backend/main";
-import Memory "../backend/memory/calendar/v3";
+import Memory "../backend/memory/calendar/v4";
 import SearchWire "SearchWire";
 import TestEnvironment "TestEnvironment";
 

@@ -5,7 +5,7 @@ import { calendarToolHandlers } from "../src/service";
 const tools = listExposedTools();
 
 test("Calendar exposes the complete bounded semantic tool surface", () => {
-  expect(tools.map((tool) => tool.name).sort()).toEqual(["create_event", "delete_event", "export_event", "find_free_time", "get_event", "list_schedule", "search_events", "status", "update_event"]);
+  expect(tools.map((tool) => tool.name).sort()).toEqual(["commit_ics_import", "create_event", "delete_event", "export_event", "find_free_time", "get_event", "ics_import_status", "list_schedule", "preview_ics_import", "search_events", "status", "undo_ics_import", "update_event"]);
   for (const tool of tools) {
     expect(tool.inputSchema).toMatchObject({ type: "object", additionalProperties: false });
     expect(tool.outputSchema).toBeDefined();
@@ -14,17 +14,18 @@ test("Calendar exposes the complete bounded semantic tool surface", () => {
 
 test("Calendar tools declare conservative read and write effects", () => {
   const effects = Object.fromEntries(tools.map((tool) => [tool.name, tool.annotations?.["neutron:effects"]]));
-  expect(effects).toMatchObject({ status: ["read"], search_events: ["read"], get_event: ["read"], list_schedule: ["read"], find_free_time: ["read"], export_event: ["read"], create_event: ["write"], update_event: ["write"], delete_event: ["write"] });
+  expect(effects).toMatchObject({ status: ["read"], search_events: ["read"], get_event: ["read"], list_schedule: ["read"], find_free_time: ["read"], export_event: ["read"], preview_ics_import: ["read"], ics_import_status: ["read"], create_event: ["write"], update_event: ["write"], delete_event: ["write"], commit_ics_import: ["write"], undo_ics_import: ["write"] });
 });
 
 test("write descriptions require reconciliation and web search keeps Calendar private", () => {
-  for (const name of ["create_event", "update_event", "delete_event"]) {
+  for (const name of ["create_event", "update_event", "delete_event", "commit_ics_import"]) {
     const description = tools.find((tool) => tool.name === name)?.description ?? "";
     expect(description.toLowerCase()).toMatch(/reconcil|read|search/);
     expect(description.toLowerCase()).toContain("retry");
   }
   expect(tools.find((tool) => tool.name === "search_events")?.description).toContain("private Calendar contents");
   expect(tools.find((tool) => tool.name === "export_event")?.description).toContain("never puts private iCalendar contents into model text");
+  expect(tools.find((tool) => tool.name === "preview_ics_import")?.annotations?.["neutron:attachments"]).toMatchObject({ version: 1, input: { mediaTypes: ["text/calendar", "application/octet-stream"], maxBytes: 1_048_576 } });
 });
 
 type Call = { kind: "query" | "update"; method: string; args: JsonValue[] | undefined };

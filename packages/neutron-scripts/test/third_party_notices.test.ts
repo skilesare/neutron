@@ -530,6 +530,19 @@ test("notice bundle records the permissive branch selected from a dual license",
   }
 });
 
+test("notice bundle carries an exact MPL-2.0 package license", async () => {
+  const fixture = await createBaseFixture();
+  try {
+    await writePackage(fixture.appRoot, { name: "demo-app", version: "1.0.0", dependencies: { parser: "1.0.0" } });
+    await writePackage(path.join(fixture.repositoryRoot, "node_modules", "parser"), { name: "parser", version: "1.0.0", license: "MPL-2.0" }, { LICENSE: "Exact MPL-2.0 fixture text\n" });
+    const bundle = await buildThirdPartyNoticeBundle({ ...fixture, mopsSourcesOutput: "" });
+    expect(bundle.components[0]?.selectedLicense).toBe("MPL-2.0");
+    expect(new TextDecoder().decode(bundle.files[THIRD_PARTY_NOTICE_INDEX_PATH])).toContain('declared "MPL-2.0"');
+  } finally {
+    await fs.rm(fixture.repositoryRoot, { recursive: true, force: true });
+  }
+});
+
 test("notice bundle rejects a Mops package without an exact installed license", async () => {
   const fixture = await createBaseFixture();
   try {

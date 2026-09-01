@@ -1,4 +1,4 @@
-import CalendarMemory "../backend/memory/calendar/v3";
+import CalendarMemory "../backend/memory/calendar/v4";
 
 module {
     public func make(calendar : CalendarMemory.Mem) : {

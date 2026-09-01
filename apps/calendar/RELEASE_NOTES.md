@@ -1,6 +1,29 @@
 # Calendar release notes
 
-## 0.4.0 — in development
+## 0.5.0 — unpublished candidate
+
+- Adds bounded local `.ics` import in a killable worker with explicit preview
+  categories, per-series selection, deterministic source/UID matching, and
+  diagnostics for unsupported scheduling data.
+- Supports VEVENT UTC, floating, all-day, TZID, RRULE, RDATE, EXDATE,
+  RECURRENCE-ID, SEQUENCE, SUMMARY, DESCRIPTION, LOCATION, STATUS, and TRANSP
+  within reviewed byte/component/property/series/occurrence limits.
+- Commits the selected preview atomically through one revision-guarded backend
+  mutation. Durable bounded receipts reconcile interrupted responses and allow
+  safe undo only while affected series retain their imported revisions.
+- Adds privacy-minimal Agent attachment tools for preview, commit, status, and
+  undo. Raw source bytes, notes, and locations are not returned to model text.
+- Advances Calendar memory to schema v4 through an explicit v3-to-v4 migration;
+  the released v1/v2 lineage and locked v3 bytes remain unchanged.
+- Qualifies the exact package through a live browser import/undo flow, an
+  in-product Calendar 0.2.0-to-0.5.0 upgrade, and a two-Neutron Rendezvous
+  regression preserving confirmed meetings and live holds on both peers.
+
+Calendar 0.5.0 remains unpublished until the remaining release checklist and
+manual interoperability/Agent acceptance gates are complete and the owner
+explicitly authorizes publication.
+
+## 0.4.0 — unpublished P1 foundation
 
 - Adds managed-memory schema v3 for bounded ICS import provenance, reminder
   offsets, and bulk-operation undo receipts.
@@ -10,8 +33,8 @@
   edge so an installed Calendar can upgrade without reinstalling or losing
   Rendezvous-owned meetings.
 
-Calendar 0.4.0 is not ready for publication until the remaining P1 import,
-undo, reminder, interoperability, privacy, and release gates are complete.
+Calendar 0.4.0 was retained as a separately tested migration foundation and was
+not published. Calendar 0.5.0 supersedes it with the import/undo implementation.
 
 ## 0.3.0 — unpublished candidate
 

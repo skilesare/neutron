@@ -93,6 +93,34 @@ test("Calendar prepares a valid ICS file and saves it through optional Files", a
   }
 });
 
+test("Calendar previews, atomically imports, reconciles, and safely undoes an ICS file", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const session = await authorizedSession(browser);
+  try {
+    const calendar = await openCalendar(session.page);
+    const title = `Imported proof ${Date.now()}`;
+    const uid = `proof-${Date.now()}@calendar.test`;
+    const body = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Calendar E2E//EN", "BEGIN:VEVENT", `UID:${uid}`, "SEQUENCE:1", "DTSTART:20270115T160000Z", "DTEND:20270115T170000Z", `SUMMARY:${title}`, "DESCRIPTION:Imported without exposing raw bytes to the backend parser", "LOCATION:Review room", "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
+    await calendar.getByLabel("Choose `.ics` file").setInputFiles({ name: "proof.ics", mimeType: "text/calendar", buffer: Buffer.from(body) });
+    const preview = calendar.getByRole("region", { name: "Import preview for proof.ics" });
+    await expect(preview).toBeVisible({ timeout: 60_000 });
+    await expect(preview).toContainText(title);
+    await expect(preview).toContainText("create · 1 occurrence");
+    await expect(preview.getByText("1 backend mutation selected")).toBeVisible();
+    await preview.getByRole("button", { name: "Import 1 selected" }).click();
+    await expect(calendar.getByText(/Import committed/u)).toBeVisible({ timeout: 60_000 });
+    const search = calendar.getByRole("searchbox", { name: "Words" });
+    await search.fill(title);
+    await expect(calendar.locator(".search-results button").filter({ hasText: title }).first()).toBeVisible({ timeout: 60_000 });
+    await calendar.getByRole("button", { name: "Undo this import" }).click();
+    await expect(calendar.getByText("Import undone")).toBeVisible({ timeout: 60_000 });
+    await search.fill(`${title} no-match`); await search.fill(title);
+    await expect(calendar.locator(".search-results button").filter({ hasText: title })).toHaveCount(0, { timeout: 60_000 });
+  } finally {
+    await closeAuthorizedSession(session);
+  }
+});
+
 test("authorization removal and logout remove Calendar owner surfaces", async ({ browser }) => {
   test.setTimeout(240_000);
   const session = await authorizedSession(browser);

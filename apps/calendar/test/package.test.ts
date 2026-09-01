@@ -5,13 +5,13 @@ import { validate_neutron_conf } from "neutron-tools/src/validate_schema.js";
 
 const manifestUrl = new URL("../neutron.json", import.meta.url);
 
-test("Calendar 0.4.0 exposes bounded owner, export, search, and scheduling APIs", async () => {
+test("Calendar 0.5.0 exposes bounded owner, export, import, search, and scheduling APIs", async () => {
   const manifest = JSON.parse(await readFile(manifestUrl, "utf8")) as NeutronManifest;
   expect(validate_neutron_conf(manifest).valid).toBe(true);
   expect(manifest).toMatchObject({
     id: "calendar",
     name: "Calendar",
-    version: 400,
+    version: 500,
     update_source: "233tv-xiaaa-aaaay-aacta-cai",
     func: {
       calendar_status: { type: "query", async: false },
@@ -22,15 +22,17 @@ test("Calendar 0.4.0 exposes bounded owner, export, search, and scheduling APIs"
     },
     memory: {
       calendar: {
-        version: 3,
+        version: 4,
         schemas: {
           "1": { src: "memory/calendar/v1.mo" },
           "2": { src: "memory/calendar/v2.mo" },
           "3": { src: "memory/calendar/v3.mo" },
+          "4": { src: "memory/calendar/v4.mo" },
         },
         migrations: [
           { from: 1, to: 2, src: "memory/calendar/v1_to_v2.mo" },
           { from: 2, to: 3, src: "memory/calendar/v2_to_v3.mo" },
+          { from: 3, to: 4, src: "memory/calendar/v3_to_v4.mo" },
         ],
       },
     },
@@ -48,6 +50,9 @@ test("Calendar 0.4.0 exposes bounded owner, export, search, and scheduling APIs"
   const migrationV3 = await readFile(new URL("../backend/memory/calendar/v2_to_v3.mo", import.meta.url), "utf8");
   expect(migrationV3).toContain('import V2 "./v2"');
   expect(migrationV3).toContain('import V3 "./v3"');
+  const migrationV4 = await readFile(new URL("../backend/memory/calendar/v3_to_v4.mo", import.meta.url), "utf8");
+  expect(migrationV4).toContain('import V3 "./v3"');
+  expect(migrationV4).toContain('import V4 "./v4"');
 });
 
 test("Calendar tile uses source-bound CRUD and renders all event origins", async () => {
@@ -105,6 +110,6 @@ test("Calendar bundles only MIT FullCalendar standard views and fits the portal 
   expect(Object.keys(packageJson.dependencies).some((name) => name.includes("resource") || name.includes("premium"))).toBe(false);
   const notice = await readFile(new URL("../dist/web/THIRD_PARTY_NOTICES.txt", import.meta.url), "utf8");
   expect(notice).toContain("SPDX-License-Identifier: MIT");
-  const archive = await stat(new URL("../calendar.v0.4.0.neutron", import.meta.url));
+  const archive = await stat(new URL("../calendar.v0.5.0.neutron", import.meta.url));
   expect(archive.size).toBeLessThanOrEqual(1_900_000);
 });

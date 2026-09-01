@@ -53,6 +53,7 @@ const AUDITED_LICENSE_EXPRESSIONS = new Map<string, string>([
   ["BSD-3-Clause", "BSD-3-Clause"],
   ["ISC", "ISC"],
   ["MIT", "MIT"],
+  ["MPL-2.0", "MPL-2.0"],
   ["(AFL-2.1 OR BSD-3-Clause)", "BSD-3-Clause"],
 ]);
 
