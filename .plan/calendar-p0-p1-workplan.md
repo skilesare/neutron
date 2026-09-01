@@ -464,9 +464,11 @@ Phase 4 implementation evidence (automated portion, 2026-08-31):
 - The owner-assisted fixture was staged on the live PocketIC instance as
   `calendar-demo` with exact pinned Kernel 0.3.22, Calendar 0.6.6, Agent 0.3.9,
   and Files 0.4.3 artifacts. The focused installed-package readiness check
-  passed in 6.3 seconds: both resident endpoints reached `ready`, Agent exposed
-  its visible **Connect to OpenRouter** flow, and Calendar remained resident.
-  Credentialed prompts and screenshots remain owner-assisted.
+  was strengthened to query the authoritative Kernel inventory and passed
+  again in 6.0 seconds: installed versions are Calendar 606, Agent 309, and
+  Files 403; Calendar memory is schema v4; both resident endpoints reached
+  `ready`; Agent exposed its visible **Connect to OpenRouter** flow; and Calendar
+  remained resident. Credentialed prompts and screenshots remain owner-assisted.
 
 ## 11. P0 release gate — Calendar 0.3.0
 
