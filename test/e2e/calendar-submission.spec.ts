@@ -80,6 +80,43 @@ test("capture the standalone Calendar submission", async ({ browser }) => {
     await calendar.locator(".editor").first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: resolve(output, "04-event-details.jpg"), type: "jpeg", quality: 84 });
 
+    await calendar.getByRole("button", { name: "Export event" }).click();
+    const preparedExport = calendar.locator(".export-publication");
+    await expect(preparedExport).toBeVisible({ timeout: 60_000 });
+    await preparedExport.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: resolve(output, "06-ics-export.jpg"), type: "jpeg", quality: 84 });
+
+    await calendar.getByRole("button", { name: "New", exact: true }).click();
+    const importTitle = "Imported customer workshop";
+    const importBody = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Neutron Calendar Evidence//EN",
+      "BEGIN:VEVENT", "UID:submission-import@calendar.neutron", "SEQUENCE:1",
+      "DTSTART:20270914T150000Z", "DTEND:20270914T160000Z",
+      `SUMMARY:${importTitle}`, "LOCATION:Online", "DESCRIPTION:Review before changing the calendar",
+      "END:VEVENT", "END:VCALENDAR", "",
+    ].join("\r\n");
+    await calendar.getByLabel("Choose `.ics` file").setInputFiles({ name: "customer-workshop.ics", mimeType: "text/calendar", buffer: Buffer.from(importBody) });
+    const importPreview = calendar.getByRole("region", { name: "Import preview for customer-workshop.ics" });
+    await expect(importPreview).toContainText(importTitle, { timeout: 60_000 });
+    await importPreview.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: resolve(output, "07-ics-import-preview.jpg"), type: "jpeg", quality: 84 });
+    await importPreview.getByRole("button", { name: "Cancel preview" }).click();
+
+    const reminderStart = new Date(Date.now() + 2 * 60_000);
+    const reminderEnd = minutesAfter(reminderStart, 30);
+    const activeZone = await calendar.getByLabel("Time zone").inputValue() || "UTC";
+    await calendar.getByLabel("Title", { exact: true }).fill("Launch readiness check");
+    await calendar.getByLabel("Starts", { exact: true }).fill(zonedLocalInput(reminderStart, activeZone));
+    await calendar.getByLabel("Ends", { exact: true }).fill(zonedLocalInput(reminderEnd, activeZone));
+    await calendar.locator("label").filter({ hasText: /^Reminder/ }).locator("select").selectOption({ label: "15 minutes before" });
+    await calendar.getByRole("button", { name: "Add to calendar" }).click();
+    await expect(page.locator('[data-tid="app-tray-button-calendar"]')).toHaveAttribute("aria-label", /1 new item/, { timeout: 60_000 });
+    await page.locator('[data-tid="app-tray-button-calendar"]').click();
+    const reminderTray = page.frameLocator('[data-tid="app-tray-frame"][data-app-id="calendar"]');
+    await expect(reminderTray.getByLabel("Now").getByRole("button", { name: /Launch readiness check/ }).first()).toBeVisible({ timeout: 60_000 });
+    await page.screenshot({ path: resolve(output, "08-reminder-tray.jpg"), type: "jpeg", quality: 84 });
+    await reminderTray.locator("body").press("Escape");
+
     await page.setViewportSize({ width: 430, height: 900 });
     await page.reload({ waitUntil: "domcontentloaded" });
     const compact = page.frameLocator('[data-app-id="calendar"][data-tile-id="main"]').last();
