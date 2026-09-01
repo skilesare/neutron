@@ -71,6 +71,11 @@ metadata even though the relayed media remains encrypted.
 
 ## Build and demo
 
+The current two-Neutron fixture installs the exact Calendar 0.6.6 release
+candidate from the `calendar-hackathon` branch alongside Rendezvous. Do not
+independently publish a same-version Calendar archive rebuilt from this combined
+branch; the Calendar branch is the authoritative package source.
+
 ```sh
 npm --workspace neutron-calendar test
 npm --workspace neutron-rendezvous test
