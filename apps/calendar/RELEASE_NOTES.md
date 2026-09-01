@@ -1,6 +1,6 @@
 # Calendar release notes
 
-## 0.6.5 — unpublished candidate
+## 0.6.6 — unpublished candidate
 
 - Adds durable zero-or-one reminder offsets for a series or individual
   occurrence using the existing schema-v4 reminder collection; no new memory
@@ -16,9 +16,10 @@
   Neutron is closed or its background is unavailable.
 - Retains the locked schema-v4 and v3-to-v4 migration bytes from Calendar 0.5.0.
 
-Calendar 0.6.5 remains unpublished until the complete state-preserving upgrade,
-two-Neutron Rendezvous regression, browser acceptance, and owner authorization
-gates are complete.
+Calendar 0.6.6 passed the complete state-preserving upgrade, two-Neutron
+Rendezvous regression, browser acceptance, and security/privacy review gates.
+It remains unpublished pending manual Google/Outlook and Agent acceptance plus
+explicit owner authorization for the production publication workflow.
 
 ## 0.5.0 — unpublished candidate
 

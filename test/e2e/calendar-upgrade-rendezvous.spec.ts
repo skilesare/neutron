@@ -9,9 +9,9 @@ import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
 const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "rendezvous-local.ndeploy.json";
-const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.5.neutron");
+const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.6.neutron");
 
-test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.6.5", async ({ browser }) => {
+test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.6.6", async ({ browser }) => {
   test.setTimeout(360_000);
   const aliceRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
   const bobRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 1 });
@@ -29,15 +29,13 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     const aliceRendezvous = await openApp(alice.page, "rendezvous");
     const bobRendezvous = await openApp(bob.page, "rendezvous");
 
-    const confirmedStart = futureLocalTime(1, 14, 0);
-    await sendSingleOption(aliceRendezvous, bobRuntime.canisterId, confirmedTitle, confirmedStart);
+    await sendSingleOption(aliceRendezvous, bobRuntime.canisterId, confirmedTitle);
     const bobConfirmed = await receiveProposal(bobRendezvous, confirmedTitle);
     await bobConfirmed.getByRole("radio").check();
     await bobConfirmed.getByRole("button", { name: "Accept selected time" }).click();
     await expect(bobConfirmed.getByText("Scheduled", { exact: true })).toBeVisible({ timeout: 60_000 });
 
-    const holdStart = futureLocalTime(2, 15, 0);
-    await sendSingleOption(aliceRendezvous, bobRuntime.canisterId, holdTitle, holdStart);
+    await sendSingleOption(aliceRendezvous, bobRuntime.canisterId, holdTitle);
     const bobHold = await receiveProposal(bobRendezvous, holdTitle);
     await setCanisterRunning(aliceRuntime, false); aliceStopped = true;
     await bobHold.getByRole("radio").check();
@@ -55,7 +53,7 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     await bob.page.reload({ waitUntil: "domcontentloaded" });
     const afterRuntime = await actor.kernel_runtime_info();
     const afterApp = afterRuntime.apps.find((app) => app.scope.app_id === "calendar");
-    expect(Number(afterApp?.version)).toBe(605);
+    expect(Number(afterApp?.version)).toBe(606);
     const afterCalendarMemory = afterRuntime.memories.find((memory) => memory.id === "calendar");
     expect(Number(afterCalendarMemory?.version)).toBe(4);
     expect(String(afterApp?.scope.installation_uid)).toBe(String(beforeApp?.scope.installation_uid));
@@ -75,6 +73,29 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     await searchAndOpen(upgraded, holdTitle);
     await expect(upgraded.getByText("Tentative Rendezvous hold")).toBeVisible();
     await expect(upgraded.getByRole("button", { name: "Open meeting in Rendezvous" })).toBeVisible();
+
+    // Bring Alice through the same state-preserving update so the shared fixture
+    // is left with Calendar 0.6.6 on both sides for the full Rendezvous suite.
+    await setCanisterRunning(aliceRuntime, true); aliceStopped = false;
+    const aliceActor = await developerActor(aliceRuntime);
+    const aliceBeforeRuntime = await aliceActor.kernel_runtime_info();
+    const aliceBeforeApp = aliceBeforeRuntime.apps.find((app) => app.scope.app_id === "calendar");
+    expect(Number(aliceBeforeApp?.version)).toBe(200);
+    await uploadCandidate(alice.page);
+    await alice.page.reload({ waitUntil: "domcontentloaded" });
+    const aliceAfterRuntime = await aliceActor.kernel_runtime_info();
+    const aliceAfterApp = aliceAfterRuntime.apps.find((app) => app.scope.app_id === "calendar");
+    expect(Number(aliceAfterApp?.version)).toBe(606);
+    const aliceBeforeCalendarMemory = aliceBeforeRuntime.memories.find((memory) => memory.id === "calendar");
+    const aliceAfterCalendarMemory = aliceAfterRuntime.memories.find((memory) => memory.id === "calendar");
+    expect(Number(aliceAfterCalendarMemory?.version)).toBe(4);
+    expect(String(aliceAfterApp?.scope.installation_uid)).toBe(String(aliceBeforeApp?.scope.installation_uid));
+    const aliceBeforeMemories = aliceBeforeRuntime.memories.filter((memory) => memory.id !== "calendar").map(memoryIdentity);
+    const aliceAfterMemories = aliceAfterRuntime.memories.filter((memory) => memory.id !== "calendar").map(memoryIdentity);
+    expect(aliceAfterMemories).toEqual(expect.arrayContaining(aliceBeforeMemories));
+    expect(aliceAfterRuntime.memories).toHaveLength(aliceBeforeRuntime.memories.length);
+    expect(String(aliceAfterCalendarMemory?.owner)).toBe(String(aliceBeforeCalendarMemory?.owner));
+    expect(String(aliceAfterCalendarMemory?.schema)).not.toBe(String(aliceBeforeCalendarMemory?.schema));
   } finally {
     if (aliceStopped) await setCanisterRunning(aliceRuntime, true);
     if (alicePrincipal) await revoke(aliceRuntime, alicePrincipal);
@@ -125,14 +146,15 @@ async function openApp(page: Page, appId: "calendar" | "rendezvous"): Promise<Fr
   return frame;
 }
 
-async function sendSingleOption(rendezvous: FrameLocator, peer: string, title: string, exact: Date) {
+async function sendSingleOption(rendezvous: FrameLocator, peer: string, title: string) {
   await rendezvous.getByLabel("Their Rendezvous address").fill(peer);
   await rendezvous.getByLabel("Meeting title").fill(title);
   await rendezvous.getByRole("button", { name: "Choose dates" }).click();
   await rendezvous.getByRole("button", { name: "Find available times" }).click();
   await expect(rendezvous.getByRole("heading", { name: "Choose exact options" })).toBeVisible({ timeout: 60_000 });
-  await rendezvous.getByLabel("Add a specific time").fill(localInput(exact));
-  await rendezvous.getByRole("button", { name: "Check and add" }).click();
+  const firstAvailable = rendezvous.locator('.suggestions input[type="checkbox"]').first();
+  await expect(firstAvailable).toBeVisible({ timeout: 60_000 });
+  await firstAvailable.check();
   await expect(rendezvous.getByText("1 of 16 selected")).toBeVisible({ timeout: 60_000 });
   await rendezvous.getByRole("button", { name: "Review 1 option" }).click();
   await rendezvous.getByRole("button", { name: "Send proposal" }).click();
@@ -177,8 +199,3 @@ async function setCanisterRunning(runtime: Runtime, running: boolean) {
   if (running) await actor.start_canister({ canister_id: target });
   else await actor.stop_canister({ canister_id: target });
 }
-
-function futureLocalTime(days: number, hour: number, minute: number) {
-  const value = new Date(); value.setDate(value.getDate() + days); value.setHours(hour, minute, 0, 0); return value;
-}
-function localInput(date: Date) { return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); }

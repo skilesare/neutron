@@ -144,6 +144,26 @@ fires while the Neutron is closed or its background is unavailable. On restart,
 Calendar reconstructs the schedule from durable reminders and only catches up
 inside the documented grace window.
 
+## Data leaving Calendar
+
+- A browser file import enters Calendar only after the owner selects it. The
+  bounded local parser sees the raw bytes; Agent receives only the documented
+  compact preview when the import starts from an attachment.
+- An export leaves Calendar only as the owner-prepared projection sent to Files
+  or copied from the tile. Downloading or sharing the resulting file is an owner
+  action.
+- When the owner asks Agent to use Calendar, the bounded semantic tool result can
+  enter the configured model context. Calendar never sends raw `.ics` export
+  bytes to that context, and its tool contract prohibits putting private event
+  text into public web-search queries.
+- Calendar 0.6.6 exposes no public subscription feed, bearer URL, or certified
+  Calendar object.
+
+See [INTEROPERABILITY.md](INTEROPERABILITY.md) for Google and Outlook file
+import guidance and the explicit subscription decision, and
+[SECURITY-PRIVACY-REVIEW.md](SECURITY-PRIVACY-REVIEW.md) for the reviewed trust
+boundaries and residual risks.
+
 Key bounds: 2,000 stored occurrences, 730 occurrences/series, 100 search
 results/page, 2,000 scanned occurrences/search call, 32 availability
 candidates/request, 15–480 minute meetings, a 31-day availability horizon,
@@ -158,4 +178,4 @@ npm --workspace neutron-calendar test
 
 The package pipeline validates, builds, locks managed memory, creates method
 schemas, runs recurrence/domain/migration suites, and produces
-`apps/calendar/calendar.v0.6.5.neutron`.
+`apps/calendar/calendar.v0.6.6.neutron`.
