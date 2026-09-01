@@ -7,7 +7,7 @@ import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
 const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "calendar-upgrade-local.ndeploy.json";
-const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.5.neutron");
+const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.6.neutron");
 
 test("resident reminder survives reload, drives the badge and tray, and opens the exact event", async ({ browser }) => {
   test.setTimeout(180_000);
@@ -26,7 +26,7 @@ test("resident reminder survives reload, drives the badge and tray, and opens th
     await actor.kernel_authorized_recover(Principal.fromText(principal));
     await page.reload({ waitUntil: "domcontentloaded" });
     const installed = (await actor.kernel_runtime_info()).apps.find((app) => app.scope.app_id === "calendar");
-    if (Number(installed?.version) < 605) { await uploadCandidate(page); await page.reload({ waitUntil: "domcontentloaded" }); }
+    if (Number(installed?.version) < 606) { await uploadCandidate(page); await page.reload({ waitUntil: "domcontentloaded" }); }
 
     let calendar = await openCalendar(page);
     const start = new Date(Date.now() + 2 * 60_000); const end = new Date(Date.now() + 32 * 60_000);
@@ -53,6 +53,13 @@ test("resident reminder survives reload, drives the badge and tray, and opens th
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-tid="app-tray-button-calendar"]')).toHaveAttribute("aria-label", /1 new item/, { timeout: 60_000 });
+    calendar = await openCalendar(page);
+    const zoneInput = calendar.getByLabel("Time zone");
+    const targetZone = await zoneInput.inputValue() === "Asia/Kolkata" ? "Europe/London" : "Asia/Kolkata";
+    await zoneInput.fill(targetZone);
+    await calendar.getByRole("button", { name: /Save scheduling defaults/ }).click();
+    await expect(calendar.getByText("Scheduling defaults saved.")).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('[data-tid="app-tray-button-calendar"]')).toHaveAttribute("aria-label", /1 new item/, { timeout: 60_000 });
     await page.locator('[data-tid="app-tray-button-calendar"]').click();
     tray = page.frameLocator('[data-tid="app-tray-frame"][data-app-id="calendar"]');
     await expect(tray.getByRole("heading", { name: "Now" })).toBeVisible();
@@ -67,6 +74,12 @@ test("resident reminder survives reload, drives the badge and tray, and opens th
     await page.locator('[data-tid="app-tray-button-calendar"]').click();
     tray = page.frameLocator('[data-tid="app-tray-frame"][data-app-id="calendar"]');
     await expect(tray.locator("body")).not.toContainText(title, { timeout: 60_000 });
+    await tray.locator("body").press("Escape");
+    await page.locator('[data-tid="kernel-tray-toggle"]').click();
+    await page.locator('[data-tid="kernel-tray-logout"]').click();
+    await expect(page.locator('[data-tid="login-button"]')).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('[data-tid="app-background-frame"][data-app-id="calendar"]')).toHaveCount(0);
+    await expect(page.locator('[data-tid="app-tray-button-calendar"]')).toHaveCount(0);
   } finally {
     if (principal) {
       const actor = await createKernelActor({ canisterId: runtime.canisterId, host: runtime.gatewayUrl, identity: localIdentityFromSeed(runtime.developerIdentitySeed), fetchRootKey: true });

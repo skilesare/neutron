@@ -1,12 +1,12 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0 and P1 import/undo/reminder implementation and Calendar qualification complete through 0.6.5; the fresh two-Neutron regression, subscription-feed decision, and manual interoperability/Agent acceptance remain release gates
+Status: P0 and P1 import/undo/reminder implementation and automated Calendar qualification complete through 0.6.6; the subscription-feed decision and manual interoperability/Agent acceptance remain release gates
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
 Unpublished P0 candidate: Calendar 0.3.0 (`version` `300`)
 Unpublished import candidate: Calendar 0.5.0 (`version` `500`), `calendar` schema v4
-Unpublished reminder candidate: Calendar 0.6.5 (`version` `605`), `calendar` schema remains v4
+Unpublished reminder candidate: Calendar 0.6.6 (`version` `606`), `calendar` schema remains v4
 Current production Calendar memory: `calendar` schema v2
 Current working Kernel baseline: 0.3.22
 Upstream synchronized for implementation: `infu/neutron` `ccf8595`
@@ -653,7 +653,7 @@ Phase 6 evidence (2026-09-01):
   support bounded snooze/dismiss state if included in v3.
 - [x] Explain honestly that no reminder fires while Neutron is closed or the
   background is unavailable. Do not call this push notification.
-- [ ] Test lifecycle reload, logout, app update, timezone change, duplicate timer
+- [x] Test lifecycle reload, logout, app update, timezone change, duplicate timer
   prevention, missed reminders, badge clearing, tray accessibility, and narrow
   viewport behavior.
 
@@ -662,7 +662,7 @@ browser-resident lifecycle.
 
 Phase 7 implementation and automated evidence (2026-09-01):
 
-- Calendar 0.6.5 adds bounded series defaults and occurrence overrides using the
+- Calendar 0.6.6 adds bounded series defaults and occurrence overrides using the
   existing v4 `reminders` collection. No schema or migration bytes changed.
   Offsets are limited to zero through seven days, records to 4,000, and one
   schedule page to 200; cancelled occurrences and live holds are suppressed.
@@ -682,16 +682,29 @@ Phase 7 implementation and automated evidence (2026-09-01):
 - The focused 420px Playwright acceptance passed in 10.7 seconds after proving
   durable save, reload, resident recovery, badge, tray, a second reload,
   exact-event deep link, delete, and title-specific tray cleanup.
-- The complete Calendar release command passed in 22.1 seconds: package, 66 Bun
+- The final 0.6.6 Calendar release command passed in 24.9 seconds: package, 66 Bun
   tests, memory restoration, every Motoko domain test, and v1-to-v2,
   v2-to-v3, and v3-to-v4 migration tests.
 - A freshly reinstalled production Calendar 0.2.0 fixture passed the reviewed
-  in-product update to Calendar 0.6.5 in 36.1 seconds with representative state,
+  in-product update to Calendar 0.6.6 with representative state,
   installation identity, and schema-v4 memory intact.
-- Remaining lifecycle evidence in the combined bullet is logout-specific and the
-  fresh two-Neutron Calendar/Rendezvous regression. The latter fixture remained
-  CPU-active but did not finish first-time Alice/Bob provisioning within the
-  explicit ten-minute limit; it was stopped cleanly and is not recorded as a pass.
+- The focused reminder acceptance was extended and passed against 0.6.6 in 10.9 seconds.
+  It changes and saves the IANA display zone while one reminder remains due,
+  proves the badge remains exactly one across two reloads (no duplicate timer),
+  clears the event/reminder, then logs out through the Kernel tray and verifies
+  both Calendar's resident frame and tray button are removed.
+- The dedicated two-Neutron fixture was reset to its declared Calendar 0.2.0
+  baseline, then the exact 0.6.6 Calendar/Rendezvous upgrade regression passed in 56.9
+  seconds. It created a confirmed meeting and an interrupted live hold before
+  upgrading both Alice and Bob to 0.6.6, preserving installation identity,
+  schema-v4 Calendar memory, every non-Calendar memory, both projections, and
+  the Rendezvous handoff action. The fixture now selects an authoritative
+  currently-free suggestion instead of assuming a fixed wall time is unused.
+- The broader Rendezvous browser suite then ran against both upgraded Neutrons:
+  15 passed and one opt-in local-II diagnostic was skipped in 2.6 minutes.
+  Coverage includes reload restoration, mobile Calendar, recurrence CRUD,
+  drag/resize and stale rollback, Contacts, exact proposals, counteroffers,
+  confirmation, busy-slot rejection, and retry idempotence.
 
 ## 15. Phase 8 — P1 subscription-feed architecture decision
 
@@ -779,23 +792,36 @@ accepted by both target consumers—or P1 ships without the feed.
 
 ## 16. P1 final release gate — version strictly above Calendar 0.5.0
 
-- [ ] Complete a security/privacy review for ICS import, Agent tools, undo,
+- [x] Complete a security/privacy review for ICS import, Agent tools, undo,
   reminder lifecycle, and the bearer subscription URL.
 - [x] Increase the final Calendar release version strictly above the current
   0.5.0 import candidate after any reminder/feed package bytes are added.
 - [x] Run clean initialization and exact v2-to-v3-to-v4 production migration tests with
   representative and maximum-bound data.
-- [ ] Run complete Calendar package, frontend, backend, domain, recurrence,
+- [x] Run complete Calendar package, frontend, backend, domain, recurrence,
   migration, parser, Agent-tool, tray, certified-asset, Playwright, and upgrade
   suites.
-- [x] Verify the 0.5.0 import candidate package size and all third-party licenses.
-- [x] Install the 0.5.0 import candidate through a state-preserving in-product upgrade;
+- [x] Verify the final 0.6.6 candidate package size and all third-party licenses.
+- [x] Install the final 0.6.6 candidate through a state-preserving in-product upgrade;
   never use reinstall as the production upgrade mechanism.
 - [x] Review exact archive/source bytes and SHA-256.
 - [ ] STOP before production publication until the owner explicitly authorizes
   it. Then follow `doc/package-updates.md`, publish once, repeat the exact same
   bytes, and require receipt-v2 `batch_id: null` with every selected package and
   offered source `unchanged` on the second run.
+
+Final 0.6.6 artifact evidence (2026-09-01):
+
+- archive: `apps/calendar/calendar.v0.6.6.neutron`, 590,231 bytes,
+  SHA-256 `9e60e9f7a1a556e563b66e4884d4d8279fa8f65d48562981a5195387c28009bb`;
+- offered source: `c3fd21c9e690deaadc6e233619434c5b2175bc0958552fa1f0871ca2e328d66f.source.v1.msgpack.gz`,
+  485,978 bytes, SHA-256
+  `c3fd21c9e690deaadc6e233619434c5b2175bc0958552fa1f0871ca2e328d66f`;
+- the security/privacy review covers every implemented surface. A bearer feed
+  has no runtime or URL in 0.6.6 and is explicitly outside the reviewed release;
+- certified-asset/feed tests are not applicable because the capability is
+  deliberately absent. All other listed package, parser, Agent, tray,
+  Playwright, upgrade, and cross-app suites passed.
 
 ## 17. Cross-cutting test matrix
 
@@ -817,17 +843,17 @@ Every phase must preserve:
 
 ## 18. Documentation and evidence deliverables
 
-- [ ] Update `apps/calendar/README.md` with timezone, search, export/import,
+- [x] Update `apps/calendar/README.md` with timezone, search, export/import,
   Agent, reminder, and subscription behavior.
-- [ ] Document exactly what leaves the Neutron for browser download, OpenRouter
+- [x] Document exactly what leaves the Neutron for browser download, OpenRouter
   web search, and a public subscription feed.
-- [ ] Add an interoperability guide for Google and Outlook covering file import,
+- [x] Add an interoperability guide for Google and Outlook covering file import,
   URL subscription, polling delays, disclosure, rotation, and revocation.
 - [ ] Add screenshots for export, import preview, Agent-created event review,
   tray reminder, and feed privacy controls.
 - [ ] Record the exact Google/Outlook test dates and product surfaces; cloud UI
   behavior is external and can change.
-- [ ] Keep P0 and P1 release notes distinct.
+- [x] Keep P0 and P1 release notes distinct.
 
 ## 19. Definition of done
 

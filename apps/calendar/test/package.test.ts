@@ -5,13 +5,13 @@ import { validate_neutron_conf } from "neutron-tools/src/validate_schema.js";
 
 const manifestUrl = new URL("../neutron.json", import.meta.url);
 
-test("Calendar 0.6.5 exposes bounded owner, export, import, search, reminder, and scheduling APIs", async () => {
+test("Calendar 0.6.6 exposes bounded owner, export, import, search, reminder, and scheduling APIs", async () => {
   const manifest = JSON.parse(await readFile(manifestUrl, "utf8")) as NeutronManifest;
   expect(validate_neutron_conf(manifest).valid).toBe(true);
   expect(manifest).toMatchObject({
     id: "calendar",
     name: "Calendar",
-    version: 605,
+    version: 606,
     update_source: "233tv-xiaaa-aaaay-aacta-cai",
     func: {
       calendar_status: { type: "query", async: false },
@@ -113,6 +113,6 @@ test("Calendar bundles only MIT FullCalendar standard views and fits the portal 
   expect(Object.keys(packageJson.dependencies).some((name) => name.includes("resource") || name.includes("premium"))).toBe(false);
   const notice = await readFile(new URL("../dist/web/THIRD_PARTY_NOTICES.txt", import.meta.url), "utf8");
   expect(notice).toContain("SPDX-License-Identifier: MIT");
-  const archive = await stat(new URL("../calendar.v0.6.5.neutron", import.meta.url));
+  const archive = await stat(new URL("../calendar.v0.6.6.neutron", import.meta.url));
   expect(archive.size).toBeLessThanOrEqual(1_900_000);
 });
