@@ -849,8 +849,12 @@ Every phase must preserve:
   web search, and a public subscription feed.
 - [x] Add an interoperability guide for Google and Outlook covering file import,
   URL subscription, polling delays, disclosure, rotation, and revocation.
-- [ ] Add screenshots for export, import preview, Agent-created event review,
-  tray reminder, and feed privacy controls.
+- [x] Add screenshots for the prepared export, import preview, and actionable
+  tray reminder under `submission-assets/calendar/06-ics-export.jpg` through
+  `08-reminder-tray.jpg` using the exact 0.6.6 installed UI.
+- [ ] Add an Agent-created event review screenshot only after the real Agent
+  0.3.9 acceptance run. Feed privacy controls are not applicable because the
+  subscription feed is withheld from 0.6.6.
 - [ ] Record the exact Google/Outlook test dates and product surfaces; cloud UI
   behavior is external and can change.
 - [x] Keep P0 and P1 release notes distinct.
