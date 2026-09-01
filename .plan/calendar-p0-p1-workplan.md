@@ -545,6 +545,13 @@ Phase 5 evidence (2026-09-01):
   installation UID, non-Calendar memory inventory, timed/all-day data,
   recurrence, exceptions, Busy/Free state, location, notes, and UTC instants.
   Reinstall was used only to initialize the disposable 0.2.0 fixture.
+- The two-Neutron Rendezvous fixture also passed in 53.3 seconds using the
+  canonical Calendar-branch 0.4.0 archive. Confirmed meetings and a deliberately
+  interrupted live hold survived v2-to-v3 on both peers, remained identifiable
+  as Rendezvous events, and retained their Calendar/Rendezvous handoff actions.
+  `calendar-hackathon` remains the authoritative Calendar package builder; the
+  combined branch is an integration/test branch and must not publish an
+  independently rebuilt Calendar package under the same version.
 
 ## 13. Phase 6 — P1 ICS import, preview, atomic commit, and undo
 
