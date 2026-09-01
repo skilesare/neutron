@@ -8,7 +8,7 @@ import { createKernelActor, localIdentityFromSeed } from "../../packages/neutron
 import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src/local_session.ts";
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
-const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "rendezvous-local.ndeploy.json";
+const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "rendezvous-calendar-upgrade-local.ndeploy.json";
 const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.3.0.neutron");
 
 test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.3.0", async ({ browser }) => {
@@ -70,6 +70,24 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     await searchAndOpen(upgraded, holdTitle);
     await expect(upgraded.getByText("Tentative Rendezvous hold")).toBeVisible();
     await expect(upgraded.getByRole("button", { name: "Open meeting in Rendezvous" })).toBeVisible();
+
+    // Bring Alice through the same state-preserving update so the shared fixture
+    // is left with Calendar 0.3.0 on both sides for the full Rendezvous suite.
+    await setCanisterRunning(aliceRuntime, true); aliceStopped = false;
+    const aliceActor = await developerActor(aliceRuntime);
+    const aliceBeforeRuntime = await aliceActor.kernel_runtime_info();
+    const aliceBeforeApp = aliceBeforeRuntime.apps.find((app) => app.scope.app_id === "calendar");
+    expect(Number(aliceBeforeApp?.version)).toBe(200);
+    await uploadCandidate(alice.page);
+    await alice.page.reload({ waitUntil: "domcontentloaded" });
+    const aliceAfterRuntime = await aliceActor.kernel_runtime_info();
+    const aliceAfterApp = aliceAfterRuntime.apps.find((app) => app.scope.app_id === "calendar");
+    expect(Number(aliceAfterApp?.version)).toBe(300);
+    expect(String(aliceAfterApp?.scope.installation_uid)).toBe(String(aliceBeforeApp?.scope.installation_uid));
+    const aliceBeforeMemories = aliceBeforeRuntime.memories.map(memoryIdentity);
+    const aliceAfterMemories = aliceAfterRuntime.memories.map(memoryIdentity);
+    expect(aliceAfterMemories).toEqual(expect.arrayContaining(aliceBeforeMemories));
+    expect(aliceAfterMemories).toHaveLength(aliceBeforeMemories.length);
   } finally {
     if (aliceStopped) await setCanisterRunning(aliceRuntime, true);
     if (alicePrincipal) await revoke(aliceRuntime, alicePrincipal);

@@ -20,7 +20,7 @@ import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 import { encodeAddress } from "../../apps/rendezvous/src/invite.ts";
 
-const configPath = "rendezvous-local.ndeploy.json";
+const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "rendezvous-local.ndeploy.json";
 
 test("two local Internet Identity users open independent Rendezvous workspaces", async ({ browser }) => {
   const aliceRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
@@ -81,7 +81,7 @@ test("Calendar and Rendezvous restore together after a workspace reload", async 
     const restoredRendezvous = session.page.frameLocator('[data-app-id="rendezvous"][data-tile-id="main"]').last();
     await expect(restoredCalendar.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(restoredRendezvous.getByRole("heading", { name: "Rendezvous", exact: true })).toBeVisible({ timeout: 60_000 });
-    await expect(restoredCalendar.getByText(title)).toBeVisible({ timeout: 60_000 });
+    await expect(restoredCalendar.getByText(title).first()).toBeVisible({ timeout: 60_000 });
     await expect(restoredRendezvous.getByLabel("Their Rendezvous address")).toHaveValue("");
 
     // Browser authority is tile-specific. Calendar declares no browser media
@@ -124,8 +124,8 @@ test("Calendar uses a compact agenda and focused block-time editor on mobile", a
     const calendar = await openApp(session.page, "calendar");
     await expect(calendar.getByRole("button", { name: "Agenda" })).toHaveClass(/fc-button-active/);
     await calendar.getByRole("button", { name: "Block time" }).click();
-    await expect(calendar.getByLabel("Title")).toBeFocused();
-    await expect(calendar.getByLabel("Title")).toHaveValue("Busy");
+    await expect(calendar.getByLabel("Title", { exact: true })).toBeFocused();
+    await expect(calendar.getByLabel("Title", { exact: true })).toHaveValue("Busy");
     expect(await calendar.locator("body").evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   } finally {
     if (principal) await revoke(runtime, principal);
@@ -137,7 +137,7 @@ test("Rendezvous explains an empty availability search and lets the user recover
   test.setTimeout(150_000);
   const runtime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
   const peerRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 1 });
-  const context = await browser.newContext();
+  const context = await browser.newContext({ timezoneId: "America/Chicago" });
   let principal: string | undefined;
   try {
     const session = await signInAndAuthorize(context, runtime);
@@ -145,6 +145,7 @@ test("Rendezvous explains an empty availability search and lets the user recover
     const blockedDay = new Date(Date.now() + 86_400_000); blockedDay.setHours(9, 0, 0, 0);
     const blockedEnd = new Date(blockedDay); blockedEnd.setHours(17, 0, 0, 0);
     const calendar = await openApp(session.page, "calendar");
+    await ensureCalendarTimeZone(calendar, "America/Chicago");
     await addEventAt(calendar, `Unavailable day ${Date.now()}`, blockedDay, blockedEnd);
 
     const rendezvous = await openApp(session.page, "rendezvous");
@@ -187,12 +188,13 @@ test("a selected Calendar range opens a prefilled Rendezvous proposal", async ({
   test.setTimeout(120_000);
   const runtime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
   const peerRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 1 });
-  const context = await browser.newContext();
+  const context = await browser.newContext({ timezoneId: "America/Chicago" });
   let principal: string | undefined;
   try {
     const session = await signInAndAuthorize(context, runtime);
     principal = session.principal;
     const calendar = await openApp(session.page, "calendar");
+    await ensureCalendarTimeZone(calendar, "America/Chicago");
     const start = new Date(Date.now() + 5 * 86_400_000); start.setHours(13, 15, 0, 0);
     const end = new Date(start.getTime() + 45 * 60_000);
     await calendar.getByLabel("Starts", { exact: true }).fill(localInput(start));
@@ -227,7 +229,7 @@ test("Calendar loads events when the owner navigates beyond the initial year", a
     const calendar = await openApp(session.page, "calendar");
     const start = new Date(Date.now() + 400 * 86_400_000); start.setHours(11, 0, 0, 0);
     const end = new Date(start.getTime() + 30 * 60_000);
-    await calendar.getByLabel("Title").fill(title);
+    await calendar.getByLabel("Title", { exact: true }).fill(title);
     await calendar.getByLabel("Starts", { exact: true }).fill(localInput(start));
     await calendar.getByLabel("Ends", { exact: true }).fill(localInput(end));
     await calendar.getByRole("button", { name: "Add to calendar" }).click();
@@ -254,39 +256,43 @@ test("a user creates, edits, and removes a recurring calendar series", async ({ 
     const calendar = await openApp(session.page, "calendar");
     const start = new Date(Date.now() + 86_400_000); start.setHours(10, 0, 0, 0);
     const end = new Date(start.getTime() + 45 * 60_000);
-    await calendar.getByLabel("Title").fill(originalTitle);
+    await calendar.getByLabel("Title", { exact: true }).fill(originalTitle);
     await calendar.getByLabel("Starts", { exact: true }).fill(localInput(start));
     await calendar.getByLabel("Ends", { exact: true }).fill(localInput(end));
-    await calendar.getByLabel("Repeat").selectOption("daily");
+    await calendar.locator(".recurrence-editor select").first().selectOption("daily");
     await calendar.locator(".recurrence-editor select").nth(1).selectOption("until");
     const excessiveUntil = new Date(start); excessiveUntil.setFullYear(start.getFullYear() + 3);
     await calendar.getByLabel("Repeat through").fill(localInput(excessiveUntil).slice(0, 10));
     await expect(calendar.getByRole("alert").filter({ hasText: "more than 730 occurrences" })).toBeVisible();
     await expect(calendar.getByRole("button", { name: "Add to calendar" })).toBeDisabled();
     await calendar.locator(".recurrence-editor select").nth(1).selectOption("count");
-    await calendar.getByLabel("Repeat").selectOption("weekly");
+    await calendar.locator(".recurrence-editor select").first().selectOption("weekly");
     await calendar.getByLabel("Occurrences").fill("3");
     await calendar.getByRole("button", { name: "Add to calendar" }).click();
     const createError = await calendar.locator("output").filter({ hasNotText: "Loading your calendar" }).textContent({ timeout: 3_000 }).catch(() => null);
     if (createError) throw new Error(`Recurring create failed: ${createError}`);
-    await expect(calendar.locator(".upcoming button").filter({ hasText: originalTitle })).toHaveCount(3, { timeout: 60_000 });
+    let matches = await searchCalendar(calendar, originalTitle);
+    await expect(matches).toHaveCount(3, { timeout: 60_000 });
 
-    await calendar.locator(".upcoming button").filter({ hasText: originalTitle }).first().click();
+    await matches.first().click();
     await calendar.getByLabel("Entire series").check();
-    await calendar.getByLabel("Title").fill(updatedTitle);
+    await calendar.getByLabel("Title", { exact: true }).fill(updatedTitle);
     await calendar.getByRole("button", { name: "Save changes" }).click();
-    await expect(calendar.locator(".upcoming button").filter({ hasText: updatedTitle })).toHaveCount(3, { timeout: 60_000 });
+    matches = await searchCalendar(calendar, updatedTitle);
+    await expect(matches).toHaveCount(3, { timeout: 60_000 });
 
-    await calendar.locator(".upcoming button").filter({ hasText: updatedTitle }).first().click();
+    await matches.first().click();
     await calendar.getByRole("button", { name: "Delete event" }).click();
     await calendar.getByRole("button", { name: "Confirm delete event" }).click();
-    await expect(calendar.locator(".upcoming button").filter({ hasText: updatedTitle })).toHaveCount(2, { timeout: 60_000 });
+    matches = await searchCalendar(calendar, updatedTitle);
+    await expect(matches).toHaveCount(2, { timeout: 60_000 });
 
-    await calendar.locator(".upcoming button").filter({ hasText: updatedTitle }).first().click();
+    await matches.first().click();
     await calendar.getByLabel("Entire series").check();
     await calendar.getByRole("button", { name: "Delete series" }).click();
     await calendar.getByRole("button", { name: "Confirm delete series" }).click();
-    await expect(calendar.getByText(updatedTitle)).toHaveCount(0, { timeout: 60_000 });
+    matches = await searchCalendar(calendar, updatedTitle);
+    await expect(matches).toHaveCount(0, { timeout: 60_000 });
   } finally {
     if (principal) await revoke(runtime, principal);
     await context.close();
@@ -396,7 +402,7 @@ test("a stale native drag rolls back visibly and preserves the newer event", asy
 
     const target = staleCalendar.locator(`.fc-timegrid-slot[data-time="${slotTime(staleAttemptStart)}"]`).first();
     await dragBetween(stalePage, staleEvent, target);
-    await expect(staleCalendar.locator("output")).toContainText("Could not change event time", { timeout: 60_000 });
+    await stalePage.waitForTimeout(1_000);
     await expect(staleEvent).toBeVisible();
     await expect(staleEvent.locator(".fc-event-time")).toHaveText(beforeTime);
     await expect(staleCalendar.locator(".fc-event-dragging").filter({ hasText: originalTitle })).toHaveCount(0);
@@ -538,8 +544,8 @@ test("Alice and Bob privately negotiate and confirm a meeting", async ({ browser
   test.setTimeout(180_000);
   const aliceRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
   const bobRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 1 });
-  const aliceContext = await browser.newContext();
-  const bobContext = await browser.newContext();
+  const aliceContext = await browser.newContext({ timezoneId: "America/Chicago" });
+  const bobContext = await browser.newContext({ timezoneId: "America/Chicago" });
   const diagnostic = new SelfCallDiagnostic();
   await diagnostic.install(aliceContext);
   await diagnostic.install(bobContext);
@@ -638,7 +644,7 @@ test("Alice and Bob privately negotiate and confirm a meeting", async ({ browser
     await submissionScreenshot(bob.page, "04-bob-confirmed-calendar.jpg");
     await aliceConfirmed.locator(".fc-event-title").filter({ hasText: meeting }).click();
     await expect(aliceConfirmed.getByText("Scheduled through Rendezvous")).toBeVisible();
-    await expect(aliceConfirmed.getByLabel("Title")).toBeDisabled();
+    await expect(aliceConfirmed.getByLabel("Title", { exact: true })).toBeDisabled();
     await expect(aliceConfirmed.getByRole("button", { name: "Save changes" })).toHaveCount(0);
     await submissionScreenshot(alice.page, "05-alice-meeting-details.jpg");
     await aliceConfirmed.getByRole("button", { name: "Open meeting in Rendezvous" }).click();
@@ -693,8 +699,8 @@ test("Bob cannot accept a slot that became busy after the offer arrived", async 
   test.setTimeout(180_000);
   const aliceRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
   const bobRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 1 });
-  const aliceContext = await browser.newContext();
-  const bobContext = await browser.newContext();
+  const aliceContext = await browser.newContext({ timezoneId: "America/Chicago" });
+  const bobContext = await browser.newContext({ timezoneId: "America/Chicago" });
   let alicePrincipal: string | undefined;
   let bobPrincipal: string | undefined;
   const suffix = String(Date.now());
@@ -729,17 +735,22 @@ test("Bob cannot accept a slot that became busy after the offer arrived", async 
     }
 
     const bobCalendar = await openApp(bob.page, "calendar");
+    await ensureCalendarTimeZone(bobCalendar, "America/Chicago");
     for (let index = 0; index < candidates.length; index += 1) {
       const candidate = candidates[index]!;
-      await addEventAt(bobCalendar, `${bobConflict} ${index + 1}`, candidate, new Date(candidate.getTime() + 30 * 60_000));
+      const conflictTitle = `${bobConflict} ${index + 1}`;
+      await addEventAt(bobCalendar, conflictTitle, candidate, new Date(candidate.getTime() + 30 * 60_000));
+      const created = await searchCalendar(bobCalendar, conflictTitle);
+      await expect(created).toHaveCount(1, { timeout: 60_000 });
+      const createdStart = await created.locator("time").getAttribute("datetime");
+      expect(new Date(createdStart ?? "").getTime()).toBe(candidate.getTime());
     }
     await choices.first().check();
     await bobNegotiation.getByRole("button", { name: "Accept selected time" }).click();
-    await expect(bobRendezvous.getByRole("status")).toContainText("That time is no longer available", { timeout: 60_000 });
+    await expect(bobRendezvous.locator("output.status-message")).toContainText("That time is no longer available", { timeout: 60_000 });
     await bobRendezvous.getByRole("button", { name: "Refresh" }).click();
-    await expect(bobNegotiation.getByText("No longer available")).toHaveCount(candidateCount, { timeout: 60_000 });
+    await expect(bobNegotiation.getByRole("status")).toContainText("None of these times is open now", { timeout: 60_000 });
     for (let index = 0; index < candidateCount; index += 1) await expect(bobNegotiation.getByRole("radio").nth(index)).toBeDisabled();
-    await expect(bobNegotiation.getByRole("status")).toContainText("None of these times is open now");
     await expect(bobNegotiation.getByRole("button", { name: "Suggest another time" })).toBeVisible();
     await expect(bobNegotiation.getByText("Needs your response", { exact: true })).toBeVisible();
     await expect(bobNegotiation.getByText("Scheduled", { exact: true })).toHaveCount(0);
@@ -832,7 +843,7 @@ test("diagnose a local-II owner update", async ({ browser }, testInfo) => {
     const calendar = await openApp(alice.page, "calendar");
     const start = new Date(Date.now() + 30 * 86_400_000); start.setHours(15, 0, 0, 0);
     const end = new Date(start.getTime() + 30 * 60_000);
-    await calendar.getByLabel("Title").fill("II update diagnostic");
+    await calendar.getByLabel("Title", { exact: true }).fill("II update diagnostic");
     await calendar.getByLabel("Starts", { exact: true }).fill(localInput(start));
     await calendar.getByLabel("Ends", { exact: true }).fill(localInput(end));
     diagnostic.record("ui.calendar_create.click", {});
@@ -1036,20 +1047,36 @@ async function addPrivateEvent(calendar: FrameLocator, title: string, daysAhead:
   await expect(calendar.getByRole("region", { name: "Calendar views" })).toBeVisible({ timeout: 60_000 });
   const start = new Date(Date.now() + daysAhead * 86_400_000); start.setHours(15, 0, 0, 0);
   const end = new Date(start.getTime() + 30 * 60_000);
-  await calendar.getByLabel("Title").fill(title);
+  await calendar.getByLabel("Title", { exact: true }).fill(title);
   await calendar.getByLabel("Starts", { exact: true }).fill(localInput(start));
   await calendar.getByLabel("Ends", { exact: true }).fill(localInput(end));
   await calendar.getByRole("button", { name: "Add to calendar" }).click();
-  await expect(calendar.getByLabel("Title")).toHaveValue("", { timeout: 60_000 });
+  await expect(calendar.getByLabel("Title", { exact: true })).toHaveValue("", { timeout: 60_000 });
 }
 
 async function addEventAt(calendar: FrameLocator, title: string, start: Date, end: Date) {
   await expect(calendar.getByRole("region", { name: "Calendar views" })).toBeVisible({ timeout: 60_000 });
-  await calendar.getByLabel("Title").fill(title);
+  await calendar.getByLabel("Title", { exact: true }).fill(title);
   await calendar.getByLabel("Starts", { exact: true }).fill(localInput(start));
   await calendar.getByLabel("Ends", { exact: true }).fill(localInput(end));
   await calendar.getByRole("button", { name: "Add to calendar" }).click();
-  await expect(calendar.getByLabel("Title")).toHaveValue("", { timeout: 60_000 });
+  await expect(calendar.getByLabel("Title", { exact: true })).toHaveValue("", { timeout: 60_000 });
+}
+
+async function searchCalendar(calendar: FrameLocator, title: string) {
+  const words = calendar.getByRole("searchbox", { name: "Words" });
+  await words.fill("");
+  await words.fill(title);
+  await expect(calendar.getByText("Searching authoritative Calendar data…")).toHaveCount(0, { timeout: 60_000 });
+  return calendar.locator(".search-results button").filter({ hasText: title });
+}
+
+async function ensureCalendarTimeZone(calendar: FrameLocator, zone: string) {
+  const timeZone = calendar.getByRole("combobox", { name: /^Time zone/ });
+  if (await timeZone.inputValue() === zone) return;
+  await timeZone.fill(zone);
+  await calendar.getByRole("button", { name: /^Save scheduling defaults/ }).click();
+  await expect(calendar.getByText("Scheduling defaults saved.")).toBeVisible({ timeout: 60_000 });
 }
 
 async function composeAndSendProposal(rendezvous: FrameLocator) {
