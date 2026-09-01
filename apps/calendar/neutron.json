@@ -2,9 +2,14 @@
   "format": 3,
   "name": "Calendar",
   "id": "calendar",
-  "version": 200,
+  "version": 300,
+  "update_source": "233tv-xiaaa-aaaay-aacta-cai",
   "description": "Private calendar and local availability for installed Neutron apps",
   "src": "main.mo",
+  "background": {
+    "path": "service.html",
+    "description": "Calendar tools for the owner and Neutron Agent"
+  },
   "tiles": [
     {
       "id": "main",
@@ -21,6 +26,8 @@
         "calendar_range_v2",
         "calendar_series_get_v2",
         "calendar_series_occurrences_v2",
+        "calendar_export_v1",
+        "calendar_search_v1",
         "calendar_series_create_v2",
         "calendar_series_update_v2",
         "calendar_series_remove_v2",
@@ -30,7 +37,8 @@
         "calendar_update",
         "calendar_remove",
         "calendar_preferences_get",
-        "calendar_preferences_set"
+        "calendar_preferences_set",
+        "calendar_find_free_v1"
       ]
     }
   },
@@ -52,6 +60,14 @@
       "async": false
     },
     "calendar_series_occurrences_v2": {
+      "type": "query",
+      "async": false
+    },
+    "calendar_export_v1": {
+      "type": "query",
+      "async": false
+    },
+    "calendar_search_v1": {
       "type": "query",
       "async": false
     },
@@ -93,6 +109,10 @@
     },
     "calendar_preferences_set": {
       "type": "update",
+      "async": false
+    },
+    "calendar_find_free_v1": {
+      "type": "query",
       "async": false
     },
     "calendar_availability_v1": {

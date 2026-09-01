@@ -8,15 +8,13 @@
     "authorized_principals": [
       "pbwxr-uqxlv-aiwi3-omw2n-ptdex-kyifb-kdsn6-zdiyd-ggzpu-nrzik-rqe"
     ],
-    "nodes": ["calendar-demo"]
+    "nodes": ["calendar-upgrade"]
   },
   "artifacts": {
     "kind": "inline",
     "kernel": { "path": "apps/kernel/kernel.v0.3.22.neutron" },
     "packages": [
-      { "path": "apps/calendar/calendar.v0.3.0.neutron" },
-      { "path": "apps/agent/agent.v0.3.9.neutron" },
-      { "path": "apps/vfs/files.v0.4.3.neutron" }
+      { "path": "apps/calendar/calendar.v0.2.0.neutron" }
     ]
   }
 }

@@ -4,6 +4,8 @@ import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Calendar "../backend/main";
 import Memory "../backend/memory/calendar/v2";
+import SearchWire "SearchWire";
+import TestEnvironment "TestEnvironment";
 
 let minute : Nat = 60_000_000_000;
 let day : Nat = 86_400_000_000_000;
@@ -15,17 +17,21 @@ let second = Nat64.fromNat((targetDay + 1) * day + 600 * minute);
 let third = Nat64.fromNat((targetDay + 2) * day + 600 * minute);
 let duration = Nat64.fromNat(30 * minute);
 let memory = Memory.init();
-let calendar = Calendar.Init({ stable_memory = { calendar = memory } });
+let calendar = Calendar.Init(TestEnvironment.make(memory));
 let occurrences : [Calendar.OccurrenceInput] = [
     { recurrence_key = "20260824T100000"; start_ns = first; end_ns = first + duration },
     { recurrence_key = "20260825T100000"; start_ns = second; end_ns = second + duration },
     { recurrence_key = "20260826T100000"; start_ns = third; end_ns = third + duration },
 ];
-let write : Calendar.SeriesWrite = { title = "Daily focus"; notes = "Private"; location = "Desk"; color = "ocean"; availability = #free; kind = #timed; time_zone = "UTC"; recurrence = ?{ frequency = #daily; interval = 1; weekdays_mask = 0; month_day = null; end = #count(3) }; occurrences };
+let write : Calendar.SeriesWrite = { title = "Daily focus 旅行"; notes = "Private"; location = "Desk"; color = "ocean"; availability = #free; kind = #timed; time_zone = "UTC"; recurrence = ?{ frequency = #daily; interval = 1; weekdays_mask = 0; month_day = null; end = #count(3) }; occurrences };
 let #ok(created) = calendar.calendar_series_create_v2({ expected_revision = 0; value = write }) else Runtime.trap("series create failed");
 assert (created.id == 1 and created.revision == 1);
 let range = calendar.calendar_range_v2({ start_ns = first; end_ns = third + duration; offset = 0; limit = 10 });
 assert (range.total == 3 and range.occurrences[0].location == "Desk" and range.occurrences[0].availability == #free);
+let #ok(firstSearch) = calendar.calendar_search_v1(SearchWire.encode({ query_text = "旅行"; start_ns = null; end_ns = null; source = ?"owner"; availability = ?#free; status = null; recurring = ?true; expected_revision = null; offset = 0; limit = 2 })) else Runtime.trap("search failed");
+assert (firstSearch.occurrences.size() == 2 and firstSearch.next_offset == ?2);
+let #ok(secondSearch) = calendar.calendar_search_v1(SearchWire.encode({ query_text = "daily FOCUS"; start_ns = ?first; end_ns = ?(third + duration); source = null; availability = null; status = null; recurring = null; expected_revision = ?firstSearch.revision; offset = 2; limit = 2 })) else Runtime.trap("search continuation failed");
+assert (secondSearch.occurrences.size() == 1 and secondSearch.next_offset == null);
 let free = calendar.calendar_availability_v1({ window_start_ns = first; window_end_ns = first + duration; duration_minutes = 30; candidate_starts_ns = [first] });
 assert (free.available_starts_ns.size() == 1);
 // Working hours guide client-side suggestions; they are not a UTC rejection gate.
@@ -47,6 +53,8 @@ let #ok(overridden) = calendar.calendar_occurrence_update_v2({
     location_override = ?"Library";
 }) else Runtime.trap("occurrence override failed");
 assert (overridden.status == "overridden" and overridden.title == "Special focus");
+let #stale(searchStale) = calendar.calendar_search_v1(SearchWire.encode({ query_text = ""; start_ns = null; end_ns = null; source = null; availability = null; status = null; recurring = null; expected_revision = ?firstSearch.revision; offset = 0; limit = 10 })) else Runtime.trap("stale search continuation accepted");
+assert (searchStale.revision == calendar.calendar_status().revision);
 let #err(staleOccurrence) = calendar.calendar_occurrence_update_v2({
     occurrence_id = firstOccurrence.id;
     expected_occurrence_revision = firstOccurrence.revision;
@@ -73,6 +81,8 @@ assert (afterUpdate.occurrences[0].location == "Library");
 assert (afterUpdate.occurrences[0].status == "overridden");
 assert (afterUpdate.occurrences[1].start_ns == third);
 assert (afterUpdate.occurrences[1].title == "Renamed daily focus");
+let #ok(afterCancellationSearch) = calendar.calendar_search_v1(SearchWire.encode({ query_text = "focus"; start_ns = null; end_ns = null; source = null; availability = null; status = null; recurring = null; expected_revision = null; offset = 0; limit = 10 })) else Runtime.trap("post-cancellation search failed");
+assert (afterCancellationSearch.occurrences.size() == 2);
 
 // A drag/resize sends null metadata fields and must preserve prior overrides.
 let preserved = afterUpdate.occurrences[0];
@@ -90,5 +100,12 @@ assert (afterDrag.start_ns == movedAgain and afterDrag.title == "Special focus")
 assert (afterDrag.notes == "Exception notes" and afterDrag.location == "Library");
 let busy = calendar.calendar_availability_v1({ window_start_ns = movedAgain; window_end_ns = movedAgain + duration; duration_minutes = 30; candidate_starts_ns = [movedAgain] });
 assert (busy.available_starts_ns.size() == 0);
+let exportPage = calendar.calendar_export_v1({ series_id = ?created.id; occurrence_id = null; start_ns = null; end_ns = null; include_holds = false; offset = 0; limit = 100 });
+assert (exportPage.revision == calendar.calendar_status().revision and exportPage.total == 3);
+assert (exportPage.occurrences[0].time_zone == "UTC");
+assert (exportPage.occurrences[0].occurrence.status == "overridden");
+assert (exportPage.occurrences[1].occurrence.status == "cancelled");
+let boundedExport = calendar.calendar_export_v1({ series_id = null; occurrence_id = null; start_ns = ?third; end_ns = ?(third + duration); include_holds = false; offset = 0; limit = 100 });
+assert (boundedExport.total == 1 and boundedExport.occurrences[0].occurrence.start_ns == third);
 let #ok(_) = calendar.calendar_series_remove_v2({ series_id = created.id; expected_series_revision = 2 }) else Runtime.trap("series remove failed");
 assert (calendar.calendar_status().event_count == 0);

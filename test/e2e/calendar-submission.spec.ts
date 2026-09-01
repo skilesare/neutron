@@ -66,7 +66,7 @@ test("capture the standalone Calendar submission", async ({ browser }) => {
     await expect(calendar.locator(".fc-event-title").filter({ hasText: "Design review" }).first()).toBeVisible({ timeout: 60_000 });
     await page.screenshot({ path: resolve(output, "01-week-calendar.jpg"), type: "jpeg", quality: 84 });
 
-    await calendar.locator(".upcoming button").filter({ hasText: "Focus time" }).first().click();
+    await openSearchResult(calendar, "Focus time");
     await calendar.getByLabel("Entire series").check();
     await calendar.locator(".recurrence-editor").scrollIntoViewIfNeeded();
     await page.screenshot({ path: resolve(output, "02-recurring-series.jpg"), type: "jpeg", quality: 84 });
@@ -76,7 +76,7 @@ test("capture the standalone Calendar submission", async ({ browser }) => {
     await calendar.getByRole("button", { name: "Month", exact: true }).click();
     await page.screenshot({ path: resolve(output, "03-month-calendar.jpg"), type: "jpeg", quality: 84 });
 
-    await calendar.locator(".upcoming button").filter({ hasText: "Design review" }).first().click();
+    await openSearchResult(calendar, "Design review");
     await calendar.locator(".editor").first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: resolve(output, "04-event-details.jpg"), type: "jpeg", quality: 84 });
 
@@ -87,6 +87,74 @@ test("capture the standalone Calendar submission", async ({ browser }) => {
     await compact.locator(".fc-next-button").click();
     await expect(compact.locator(".fc-view-harness").getByText("Design review", { exact: true }).first()).toBeVisible();
     await page.screenshot({ path: resolve(output, "05-mobile-agenda.jpg"), type: "jpeg", quality: 84 });
+  } finally {
+    if (principal) {
+      const actor = await developerActor(runtime);
+      await actor.kernel_authorized_rem(Principal.fromText(principal));
+    }
+    await context.close();
+  }
+});
+
+test("saved timezone controls editor, recurrence preview, grid, and upcoming list", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const runtime = resolveLocalNeutronRuntime({ configPath });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: "America/Los_Angeles" });
+  const page = await context.newPage();
+  let principal: string | undefined;
+  try {
+    await context.credentials.install();
+    await page.goto(localCanisterOrigin(runtime.canisterId, runtime.gatewayUrl));
+    await signInWithLocalInternetIdentity({ page, context, loginSelector: '[data-tid="login-button"]', localHost: runtime.gatewayUrl });
+    const principalNode = page.locator('[data-tid="principal"]');
+    await expect(principalNode).toBeVisible();
+    principal = (await principalNode.textContent())?.trim();
+    if (!principal) throw new Error("Internet Identity did not return a principal");
+    const actor = await developerActor(runtime);
+    await actor.kernel_authorized_recover(Principal.fromText(principal));
+    await page.reload({ waitUntil: "domcontentloaded" });
+
+    const calendar = await openCalendar(page);
+    const zoneInput = calendar.getByLabel("Time zone");
+    const targetZone = await zoneInput.inputValue() === "Asia/Kolkata" ? "Europe/London" : "Asia/Kolkata";
+    const eventTitle = `Timezone proof ${targetZone} ${Date.now()}`;
+    const startInstant = new Date(Date.now() + 2 * 60 * 60 * 1000);
+    startInstant.setUTCMinutes(0, 0, 0);
+    const endInstant = new Date(startInstant.getTime() + 60 * 60 * 1000);
+    const startWall = zonedLocalInput(startInstant, targetZone);
+    const endWall = zonedLocalInput(endInstant, targetZone);
+    const expectedTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: targetZone }).format(startInstant);
+    await zoneInput.fill(targetZone);
+    const gridInput = calendar.getByLabel("Calendar grid");
+    await gridInput.selectOption(await gridInput.inputValue() === "30" ? "60" : "30");
+    const saveDefaults = calendar.getByRole("button", { name: /Save scheduling defaults/ });
+    await expect(saveDefaults).toContainText("unsaved");
+    await saveDefaults.click();
+    await expect(calendar.getByText("Scheduling defaults saved.")).toBeVisible();
+
+    await calendar.getByLabel("Title", { exact: true }).fill(eventTitle);
+    await calendar.getByLabel("Starts", { exact: true }).fill(startWall);
+    await calendar.getByLabel("Ends", { exact: true }).fill(endWall);
+    const repeatSelect = calendar.locator(".recurrence-editor select").first();
+    await repeatSelect.selectOption("weekly");
+    await calendar.getByLabel("Occurrences").fill("2");
+    await expect(calendar.locator(".time-resolution")).toContainText(targetZone);
+    await expect(calendar.locator(".time-resolution")).toContainText(expectedTime);
+    await calendar.getByRole("button", { name: "Add to calendar" }).click();
+
+    const upcoming = calendar.locator(".upcoming").getByRole("button").filter({ hasText: eventTitle }).first();
+    await expect(upcoming).toContainText(expectedTime);
+    await upcoming.click();
+    await expect(calendar.getByLabel("Starts", { exact: true })).toHaveValue(startWall);
+    await calendar.getByLabel("Entire series").check();
+    await expect(calendar.locator(".recurrence-editor select").first()).toHaveValue("weekly");
+
+    await calendar.getByRole("button", { name: "Week", exact: true }).click();
+    for (let index = 0; index < 3 && await calendar.locator(".fc-event-title").filter({ hasText: eventTitle }).count() === 0; index += 1) await calendar.locator(".fc-next-button").click();
+    const gridEvent = calendar.locator(".fc-timegrid-event").filter({ hasText: eventTitle }).first();
+    await expect(gridEvent).toBeVisible();
+    await expect(gridEvent).toContainText(expectedTime.replace(/\s*[AP]M$/iu, ""));
+    await expect(calendar.locator(".fc-timegrid-slot").first()).toHaveAttribute("data-time", /:00$/);
   } finally {
     if (principal) {
       const actor = await developerActor(runtime);
@@ -127,18 +195,18 @@ async function addEvent(
 ) {
   const newButton = calendar.getByRole("button", { name: "New", exact: true });
   if (await newButton.count()) await newButton.click();
-  await calendar.getByLabel("Title").fill(title);
+  await calendar.getByLabel("Title", { exact: true }).fill(title);
   await calendar.getByLabel("Starts", { exact: true }).fill(localInput(start));
   await calendar.getByLabel("Ends", { exact: true }).fill(localInput(end));
-  if (options.location) await calendar.getByLabel("Location").fill(options.location);
-  if (options.notes) await calendar.getByLabel("Notes").fill(options.notes);
+  if (options.location) await calendar.getByLabel("Location", { exact: true }).fill(options.location);
+  if (options.notes) await calendar.getByLabel("Notes", { exact: true }).fill(options.notes);
   if (options.color) await calendar.getByLabel("Color").selectOption(options.color);
   if (options.repeat) {
-    await calendar.getByLabel("Repeat").selectOption(options.repeat);
+    await calendar.locator(".recurrence-editor select").first().selectOption(options.repeat);
     await calendar.getByLabel("Occurrences").fill(String(options.count ?? 4));
   }
   await calendar.getByRole("button", { name: "Add to calendar" }).click();
-  await expect(calendar.getByLabel("Title")).toHaveValue("", { timeout: 60_000 });
+  await expect(calendar.getByLabel("Title", { exact: true })).toHaveValue("", { timeout: 60_000 });
 }
 
 async function navigateUntilVisible(calendar: FrameLocator, title: string) {
@@ -147,6 +215,13 @@ async function navigateUntilVisible(calendar: FrameLocator, title: string) {
     await calendar.locator(".fc-next-button").click();
   }
   throw new Error(`Could not navigate Calendar to ${title}`);
+}
+
+async function openSearchResult(calendar: FrameLocator, title: string) {
+  await calendar.getByRole("searchbox", { name: "Words" }).fill(title);
+  const result = calendar.locator(".search-results button").filter({ hasText: title }).first();
+  await expect(result).toBeVisible({ timeout: 60_000 });
+  await result.click();
 }
 
 function nextWeekday(target: number, hour: number, minute: number) {
@@ -163,4 +238,9 @@ function minutesAfter(value: Date, minutes: number) {
 
 function localInput(value: Date) {
   return new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function zonedLocalInput(value: Date, timeZone: string) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(value).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }

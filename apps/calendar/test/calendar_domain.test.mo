@@ -5,6 +5,7 @@ import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Calendar "../backend/main";
 import Memory "../backend/memory/calendar/v2";
+import TestEnvironment "TestEnvironment";
 
 let minute : Nat = 60_000_000_000;
 let day : Nat = 86_400_000_000_000;
@@ -12,7 +13,7 @@ let now = Int.abs(Time.now());
 let start = Nat64.fromNat(now + minute * 60);
 let finish = Nat64.fromNat(now + minute * 120);
 let memory = Memory.init();
-let calendar = Calendar.Init({ stable_memory = { calendar = memory } });
+let calendar = Calendar.Init(TestEnvironment.make(memory));
 
 let #ok(created) = calendar.calendar_create({ expected_revision = 0; start_ns = start; end_ns = finish; title = "Private"; notes = "Never shared" }) else Runtime.trap("create failed");
 assert (created.id == 1 and created.revision == 1);

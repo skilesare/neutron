@@ -1,4 +1,5 @@
 import Array "mo:core/Array";
+import Int "mo:core/Int";
 import Nat16 "mo:core/Nat16";
 import Nat32 "mo:core/Nat32";
 import Nat64 "mo:core/Nat64";
@@ -24,7 +25,10 @@ module {
             let start = Nat64.toNat(candidate);
             let duplicate = switch (previous) { case (?value) candidate <= value; case null false }; previous := ?candidate;
             if (duplicate or start < startBound or start < now or start > endBound) return false;
-            let finish = start + durationNs;
+            let startInt : Int = start;
+            let durationInt : Int = durationNs;
+            let finishInt = startInt + durationInt;
+            let finish = Int.abs(finishInt);
             // Working hours are a suggestion policy interpreted in the owner's
             // browser time zone. They must not become a UTC authorization gate.
             if (finish > endBound) return false;
@@ -53,7 +57,6 @@ module {
     func overlaps(start : Nat, finish : Nat, occurrence : Memory.Occurrence, preferences : Memory.Preferences) : Bool {
         let before = Nat16.toNat(preferences.buffer_before_minutes) * Validation.MINUTE_NS;
         let after = Nat16.toNat(preferences.buffer_after_minutes) * Validation.MINUTE_NS;
-        let bufferedStart = if (start >= before) start - before else 0;
-        bufferedStart < Nat64.toNat(occurrence.end_ns) and Nat64.toNat(occurrence.start_ns) < finish + after
+        start < Nat64.toNat(occurrence.end_ns) + after and Nat64.toNat(occurrence.start_ns) < finish + before
     };
 }
