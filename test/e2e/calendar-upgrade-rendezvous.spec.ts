@@ -29,15 +29,13 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     const aliceRendezvous = await openApp(alice.page, "rendezvous");
     const bobRendezvous = await openApp(bob.page, "rendezvous");
 
-    const confirmedStart = futureLocalTime(1, 14, 0);
-    await sendSingleOption(aliceRendezvous, bobRuntime.canisterId, confirmedTitle, confirmedStart);
+    await sendSingleOption(aliceRendezvous, bobRuntime.canisterId, confirmedTitle);
     const bobConfirmed = await receiveProposal(bobRendezvous, confirmedTitle);
     await bobConfirmed.getByRole("radio").check();
     await bobConfirmed.getByRole("button", { name: "Accept selected time" }).click();
     await expect(bobConfirmed.getByText("Scheduled", { exact: true })).toBeVisible({ timeout: 60_000 });
 
-    const holdStart = futureLocalTime(2, 15, 0);
-    await sendSingleOption(aliceRendezvous, bobRuntime.canisterId, holdTitle, holdStart);
+    await sendSingleOption(aliceRendezvous, bobRuntime.canisterId, holdTitle);
     const bobHold = await receiveProposal(bobRendezvous, holdTitle);
     await setCanisterRunning(aliceRuntime, false); aliceStopped = true;
     await bobHold.getByRole("radio").check();
@@ -148,14 +146,15 @@ async function openApp(page: Page, appId: "calendar" | "rendezvous"): Promise<Fr
   return frame;
 }
 
-async function sendSingleOption(rendezvous: FrameLocator, peer: string, title: string, exact: Date) {
+async function sendSingleOption(rendezvous: FrameLocator, peer: string, title: string) {
   await rendezvous.getByLabel("Their Rendezvous address").fill(peer);
   await rendezvous.getByLabel("Meeting title").fill(title);
   await rendezvous.getByRole("button", { name: "Choose dates" }).click();
   await rendezvous.getByRole("button", { name: "Find available times" }).click();
   await expect(rendezvous.getByRole("heading", { name: "Choose exact options" })).toBeVisible({ timeout: 60_000 });
-  await rendezvous.getByLabel("Add a specific time").fill(localInput(exact));
-  await rendezvous.getByRole("button", { name: "Check and add" }).click();
+  const firstAvailable = rendezvous.locator('.suggestions input[type="checkbox"]').first();
+  await expect(firstAvailable).toBeVisible({ timeout: 60_000 });
+  await firstAvailable.check();
   await expect(rendezvous.getByText("1 of 16 selected")).toBeVisible({ timeout: 60_000 });
   await rendezvous.getByRole("button", { name: "Review 1 option" }).click();
   await rendezvous.getByRole("button", { name: "Send proposal" }).click();
@@ -200,8 +199,3 @@ async function setCanisterRunning(runtime: Runtime, running: boolean) {
   if (running) await actor.start_canister({ canister_id: target });
   else await actor.stop_canister({ canister_id: target });
 }
-
-function futureLocalTime(days: number, hour: number, minute: number) {
-  const value = new Date(); value.setDate(value.getDate() + days); value.setHours(hour, minute, 0, 0); return value;
-}
-function localInput(date: Date) { return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); }
