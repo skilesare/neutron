@@ -14,7 +14,7 @@
     "package": "npm run validate && npm run build && npm run mopack && npm run schema && npm run package:metadata && bun ../../packages/neutron-scripts/src/pack.ts",
     "watch": "bun build.ts watch",
     "test:memory": "bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/memory_release.test.mo",
-    "test:domain": "bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/availability.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/calendar_domain.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/calendar_v2_series.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/migration_v2.test.mo",
+    "test:domain": "bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/validation.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/availability.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/availability_v2.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/calendar_domain.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/calendar_v2_series.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/search.test.mo && bun ../../packages/neutron-scripts/src/run_motoko_program.ts test/migration_v2.test.mo",
     "test": "npm run package && bun test && npm run test:memory && npm run test:domain"
   },
   "author": "",
@@ -41,6 +41,7 @@
     "esbuild-sass-plugin": "^3.7.0",
     "eslint": "^10.6.0",
     "eslint-plugin-react": "^7.37.5",
+    "ical.js": "^2.2.1",
     "icblast": "^4.3.0",
     "neutron-scripts": "^1.1.0"
   }

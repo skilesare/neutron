@@ -15,8 +15,8 @@ async function stripRemoteDiagnostics(): Promise<void> {
 }
 
 const config: BuildOptions = {
-  entryPoints: ["./src/index.tsx"],
-  outfile,
+  entryPoints: { main: "./src/index.tsx", service: "./src/service.ts" },
+  outdir: "./dist/web",
   bundle: true,
   minify: true,
   external: [],

@@ -1,6 +1,8 @@
 import Array "mo:core/Array";
 import Blob "mo:core/Blob";
+import Iter "mo:core/Iter";
 import Int "mo:core/Int";
+import Nat "mo:core/Nat";
 import Nat8 "mo:core/Nat8";
 import Nat16 "mo:core/Nat16";
 import Nat32 "mo:core/Nat32";
@@ -12,7 +14,7 @@ import Memory "memory/calendar/v2";
 import Validation "Validation";
 
 module {
-    let MAX_SERIES = 2_000; let MAX_OCCURRENCES = 10_000; let MAX_SERIES_OCCURRENCES = 730; let MAX_RANGE_RESULTS = 2_000;
+    let MAX_SERIES = 2_000; let MAX_OCCURRENCES = 10_000; let MAX_SERIES_OCCURRENCES = 730; let MAX_RANGE_RESULTS = 2_000; let MAX_SEARCH_SCAN = 2_000;
     public type Status = { revision : Nat64; event_count : Nat };
     public type Error = { code : Text; message : Text; revision : Nat64 };
     public type EventView = { id : Nat64; revision : Nat64; start_ns : Nat64; end_ns : Nat64; title : Text; notes : Text; source : Text; status : Text; hold_expires_at_ns : ?Nat64 };
@@ -42,10 +44,16 @@ module {
     public type OccurrenceRemoveRequest = { occurrence_id : Nat64; expected_occurrence_revision : Nat64 };
     public type RangeRequest = { start_ns : Nat64; end_ns : Nat64; offset : Nat; limit : Nat };
     public type SeriesView = { id : Nat64; revision : Nat64; title : Text; notes : Text; location : Text; color : Text; availability : AvailabilityMode; kind : EventKind; source : Text; time_zone : Text; recurrence : ?RecurrenceRule; created_at_ns : Nat64; updated_at_ns : Nat64 };
-    public type OccurrenceView = { id : Nat64; revision : Nat64; series_id : Nat64; series_revision : Nat64; recurrence_key : Text; start_ns : Nat64; end_ns : Nat64; title : Text; notes : Text; location : Text; color : Text; availability : AvailabilityMode; kind : EventKind; source : Text; status : Text };
+    public type OccurrenceView = { id : Nat64; revision : Nat64; series_id : Nat64; series_revision : Nat64; recurrence_key : Text; start_ns : Nat64; end_ns : Nat64; title : Text; notes : Text; location : Text; color : Text; availability : AvailabilityMode; kind : EventKind; source : Text; status : Text; time_zone : Text };
     public type RangePage = { revision : Nat64; total : Nat; occurrences : [OccurrenceView] };
     public type SeriesOccurrencesRequest = { series_id : Nat64; offset : Nat; limit : Nat };
     public type SeriesOccurrencesPage = { revision : Nat64; total : Nat; occurrences : [OccurrenceView] };
+    public type ExportRequestV1 = { series_id : ?Nat64; occurrence_id : ?Nat64; start_ns : ?Nat64; end_ns : ?Nat64; include_holds : Bool; offset : Nat; limit : Nat };
+    public type ExportOccurrenceV1 = { occurrence : OccurrenceView; series_updated_at_ns : Nat64; time_zone : Text };
+    public type ExportPageV1 = { revision : Nat64; total : Nat; occurrences : [ExportOccurrenceV1] };
+    type SearchRuntimeRequest = { query_text : Text; start_ns : ?Nat64; end_ns : ?Nat64; source : ?Text; availability : ?AvailabilityMode; status : ?Text; recurring : ?Bool; expected_revision : ?Nat64; offset : Nat; limit : Nat };
+    public type SearchPageV1 = { revision : Nat64; scanned : Nat; occurrences : [OccurrenceView]; next_offset : ?Nat };
+    public type SearchResultV1 = { #ok : SearchPageV1; #stale : { revision : Nat64 }; #invalid : { message : Text; revision : Nat64 } };
     public type SeriesResult = { #ok : SeriesView; #err : Error };
     public type OccurrenceResult = { #ok : OccurrenceView; #err : Error };
 
@@ -55,7 +63,11 @@ module {
     public type ReserveResultV1 = { #reserved : { event_id : Nat64; event_revision : Nat64; calendar_revision : Nat64 }; #conflict : { calendar_revision : Nat64 }; #stale : { calendar_revision : Nat64 }; #invalid; #full };
     public type ExternalRequestV1 = { external_id : Blob };
     public type ExternalResultV1 = { #ok : { calendar_revision : Nat64 }; #not_found : { calendar_revision : Nat64 }; #invalid };
-    public type AppBackendEnvironment = { stable_memory : { calendar : Memory.Mem } };
+    public type AppBackendEnvironment = {
+        stable_memory : {
+            calendar : Memory.Mem;
+        };
+    };
 
     public class Init(env : AppBackendEnvironment) {
         let mem = env.stable_memory.calendar;
@@ -76,6 +88,50 @@ module {
             let values = Array.sort<Memory.Occurrence>(Array.filter<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id == request.series_id }), func(left, right) { Nat64.compare(left.start_ns, right.start_ns) });
             let (start, finish) = bounds(request.offset, request.limit, values.size(), MAX_SERIES_OCCURRENCES);
             { revision = mem.revision; total = values.size(); occurrences = Array.tabulate<OccurrenceView>(finish - start, func(index) { occurrenceView(values[start + index]) }) }
+        };
+        public func /*query*/calendar_export_v1(request : ExportRequestV1) : ExportPageV1 {
+            let now = nowNs();
+            let values = Array.sort<Memory.Occurrence>(Array.filter<Memory.Occurrence>(mem.occurrences, func(item) {
+                let seriesMatches = switch (request.series_id) { case (?id) item.series_id == id; case null true };
+                let occurrenceMatches = switch (request.occurrence_id) { case (?id) item.id == id; case null true };
+                let rangeMatches = switch (request.start_ns, request.end_ns) {
+                    case (?start, ?finish) start < finish and item.start_ns < finish and start < item.end_ns;
+                    case (null, null) true;
+                    case (_) false;
+                };
+                let statusMatches = switch (item.status) {
+                    case (#hold(expires)) request.include_holds and expires > now;
+                    case (_) true;
+                };
+                seriesMatches and occurrenceMatches and rangeMatches and statusMatches
+            }), func(left, right) { Nat64.compare(left.start_ns, right.start_ns) });
+            let (start, finish) = bounds(request.offset, request.limit, values.size(), Validation.MAX_PAGE);
+            {
+                revision = mem.revision;
+                total = values.size();
+                occurrences = Array.tabulate<ExportOccurrenceV1>(finish - start, func(index) {
+                    let item = values[start + index];
+                    let view = occurrenceView(item);
+                    let ?(_, series) = findSeries(item.series_id) else return { occurrence = view; series_updated_at_ns = 0; time_zone = "UTC" };
+                    { occurrence = view; series_updated_at_ns = series.updated_at_ns; time_zone = series.time_zone }
+                });
+            }
+        };
+        public func /*query*/calendar_search_v1(wire : Text) : SearchResultV1 {
+            let ?request = decodeSearchWire(wire) else return #invalid({ message = "Invalid calendar search transport"; revision = mem.revision });
+            switch (request.expected_revision) { case (?expected) if (expected != mem.revision) return #stale({ revision = mem.revision }); case (_) {} };
+            if (not validSearchRequest(request)) return #invalid({ message = "Invalid or unbounded calendar search"; revision = mem.revision });
+            let needle = Text.toLower(request.query_text);
+            let start = if (request.offset > mem.occurrences.size()) mem.occurrences.size() else request.offset;
+            let scanFinish = if (start + MAX_SEARCH_SCAN > mem.occurrences.size()) mem.occurrences.size() else start + MAX_SEARCH_SCAN;
+            var index = start;
+            var values : [OccurrenceView] = [];
+            while (index < scanFinish and values.size() < request.limit) {
+                let item = mem.occurrences[index];
+                if (matchesSearch(item, needle, request)) values := Array.concat(values, [occurrenceView(item)]);
+                index += 1;
+            };
+            #ok({ revision = mem.revision; scanned = index - start; occurrences = values; next_offset = if (index < mem.occurrences.size()) ?index else null })
         };
 
         public func /*update*/calendar_series_create_v2(request : SeriesCreateRequest) : SeriesResult {
@@ -165,6 +221,10 @@ module {
             if (not Validation.validPreferences(request.day_start_minute, request.day_end_minute, request.allowed_weekdays_mask, request.slot_increment_minutes, request.buffer_before_minutes, request.buffer_after_minutes, request.display_time_zone)) return #err(error("invalid", "Invalid scheduling preferences", mem.revision));
             mem.preferences := { day_start_minute = request.day_start_minute; day_end_minute = request.day_end_minute; allowed_weekdays_mask = request.allowed_weekdays_mask; slot_increment_minutes = request.slot_increment_minutes; buffer_before_minutes = request.buffer_before_minutes; buffer_after_minutes = request.buffer_after_minutes; display_time_zone = request.display_time_zone }; mem.revision += 1; #ok(preferencesView())
         };
+        public func /*query*/calendar_find_free_v1(request : AvailabilityRequestV1) : AvailabilityResultV1 {
+            if (not Validation.validDuration(request.duration_minutes) or request.candidate_starts_ns.size() > Validation.MAX_CANDIDATES or not validRange(request.window_start_ns, request.window_end_ns)) return { revision = mem.revision; available_starts_ns = [] };
+            { revision = mem.revision; available_starts_ns = Availability.filter(mem.occurrences, mem.series, mem.preferences, nowNs(), request.window_start_ns, request.window_end_ns, request.duration_minutes, request.candidate_starts_ns) }
+        };
 
         public func /*internal:apps*/calendar_availability_v1(request : AvailabilityRequestV1) : AvailabilityResultV1 { { revision = mem.revision; available_starts_ns = Availability.filter(mem.occurrences, mem.series, mem.preferences, nowNs(), request.window_start_ns, request.window_end_ns, request.duration_minutes, request.candidate_starts_ns) } };
         public func /*internal:apps*/calendar_reserve_v1(request : ReserveRequestV1) : ReserveResultV1 {
@@ -193,7 +253,7 @@ module {
         func validateSeriesWrite(value : SeriesWrite, replacing : Nat) : ?Error {
             if (mem.series.size() >= MAX_SERIES and replacing == 0) return ?error("full", "Series capacity reached", mem.revision);
             if (value.occurrences.size() == 0 or value.occurrences.size() > MAX_SERIES_OCCURRENCES or mem.occurrences.size() - replacing + value.occurrences.size() > MAX_OCCURRENCES) return ?error("full", "Occurrence capacity reached", mem.revision);
-            if (value.title.size() == 0 or not Validation.textWithin(value.title, Validation.MAX_TITLE_BYTES) or not Validation.textWithin(value.notes, Validation.MAX_NOTES_BYTES) or not Validation.textWithin(value.location, 512) or not Validation.textWithin(value.color, 32) or not Validation.textWithin(value.time_zone, Validation.MAX_ZONE_BYTES)) return ?error("invalid", "Invalid series fields", mem.revision);
+            if (value.title.size() == 0 or not Validation.textWithin(value.title, Validation.MAX_TITLE_BYTES) or not Validation.textWithin(value.notes, Validation.MAX_NOTES_BYTES) or not Validation.textWithin(value.location, 512) or not Validation.textWithin(value.color, 32) or not Validation.validTimeZone(value.time_zone)) return ?error("invalid", "Invalid series fields", mem.revision);
             switch (value.recurrence) { case (?rule) { if (not validRecurrence(rule, value.occurrences.size())) return ?error("invalid_recurrence", "Invalid recurrence rule", mem.revision) }; case (_) {} };
             var previousStart : ?Nat64 = null; var previousKey = "";
             for (item in value.occurrences.vals()) { if (not validOccurrence(item.start_ns, item.end_ns, item.recurrence_key)) return ?error("invalid_occurrence", "Invalid occurrence", mem.revision); switch (previousStart) { case (?start) { if (item.start_ns <= start or Text.compare(item.recurrence_key, previousKey) == #equal) return ?error("invalid_occurrence", "Occurrences must be ordered and unique", mem.revision) }; case (_) {} }; previousStart := ?item.start_ns; previousKey := item.recurrence_key };
@@ -205,6 +265,79 @@ module {
         func validOverrides(title : ?Text, notes : ?Text, location : ?Text) : Bool { optionWithin(title, Validation.MAX_TITLE_BYTES) and optionWithin(notes, Validation.MAX_NOTES_BYTES) and optionWithin(location, 512) };
         func optionWithin(value : ?Text, limit : Nat) : Bool { switch (value) { case (?text) Validation.textWithin(text, limit); case null true } };
         func validRange(start : Nat64, finish : Nat64) : Bool { start < finish and Nat64.toNat(finish) - Nat64.toNat(start) <= 366 * Validation.DAY_NS };
+        func validSearchRequest(request : SearchRuntimeRequest) : Bool {
+            if (not Validation.textWithin(request.query_text, 256) or request.limit == 0 or request.limit > Validation.MAX_PAGE) return false;
+            switch (request.start_ns, request.end_ns) { case (?start, ?finish) if (start >= finish) return false; case (_) {} };
+            switch (request.source) { case (?value) if (value != "owner" and value != "rendezvous") return false; case (_) {} };
+            switch (request.status) { case (?value) if (value != "normal" and value != "overridden" and value != "hold" and value != "confirmed") return false; case (_) {} };
+            true
+        };
+        func decodeSearchWire(wire : Text) : ?SearchRuntimeRequest {
+            if (wire.size() > 4_096) return null;
+            let encoded = Iter.toArray(Text.split(wire, #char '|'));
+            if (encoded.size() != 10) return null;
+            func nibble(character : Char) : ?Nat8 {
+                switch (character) {
+                    case ('0') ?0; case ('1') ?1; case ('2') ?2; case ('3') ?3;
+                    case ('4') ?4; case ('5') ?5; case ('6') ?6; case ('7') ?7;
+                    case ('8') ?8; case ('9') ?9; case ('a') ?10; case ('b') ?11;
+                    case ('c') ?12; case ('d') ?13; case ('e') ?14; case ('f') ?15;
+                    case (_) null;
+                }
+            };
+            func decode(value : Text) : ?Text {
+                let characters = Text.toArray(value);
+                if (characters.size() % 2 != 0) return null;
+                var bytes : [Nat8] = [];
+                var index = 0;
+                while (index < characters.size()) {
+                    let ?high = nibble(characters[index]) else return null;
+                    let ?low = nibble(characters[index + 1]) else return null;
+                    bytes := Array.concat<Nat8>(bytes, [high * 16 + low]);
+                    index += 2;
+                };
+                Text.decodeUtf8(Blob.fromArray(bytes))
+            };
+            let ?queryText = decode(encoded[0]) else return null;
+            let ?startText = decode(encoded[1]) else return null;
+            let ?endText = decode(encoded[2]) else return null;
+            let ?sourceTextValue = decode(encoded[3]) else return null;
+            let ?availabilityText = decode(encoded[4]) else return null;
+            let ?statusTextValue = decode(encoded[5]) else return null;
+            let ?recurringText = decode(encoded[6]) else return null;
+            let ?revisionText = decode(encoded[7]) else return null;
+            let ?offsetText = decode(encoded[8]) else return null;
+            let ?limitText = decode(encoded[9]) else return null;
+            let ?offset = Nat.fromText(offsetText) else return null;
+            let ?limit = Nat.fromText(limitText) else return null;
+            let parseNat64 = func(value : Text) : ?Nat64 {
+                if (value == "") return null;
+                let ?number = Nat.fromText(value) else return null;
+                if (number > 18_446_744_073_709_551_615) return null;
+                ?Nat64.fromNat(number)
+            };
+            let start = if (startText == "") null else parseNat64(startText);
+            let finish = if (endText == "") null else parseNat64(endText);
+            let revision = if (revisionText == "") null else parseNat64(revisionText);
+            if ((startText != "" and start == null) or (endText != "" and finish == null) or (revisionText != "" and revision == null)) return null;
+            let availability : ?AvailabilityMode = if (availabilityText == "") null else if (availabilityText == "busy") ?#busy else if (availabilityText == "free") ?#free else return null;
+            let recurring : ?Bool = if (recurringText == "") null else if (recurringText == "true") ?true else if (recurringText == "false") ?false else return null;
+            ?{ query_text = queryText; start_ns = start; end_ns = finish; source = if (sourceTextValue == "") null else ?sourceTextValue; availability; status = if (statusTextValue == "") null else ?statusTextValue; recurring; expected_revision = revision; offset; limit }
+        };
+        func matchesSearch(item : Memory.Occurrence, needle : Text, request : SearchRuntimeRequest) : Bool {
+            let ?(_, series) = findSeries(item.series_id) else return false;
+            let now = nowNs();
+            switch (item.status) { case (#cancelled) return false; case (#hold(expires)) if (expires <= now) return false; case (_) {} };
+            switch (request.start_ns) { case (?start) if (item.end_ns <= start) return false; case (_) {} };
+            switch (request.end_ns) { case (?finish) if (item.start_ns >= finish) return false; case (_) {} };
+            switch (request.source) { case (?value) if (sourceText(series.source) != value) return false; case (_) {} };
+            switch (request.availability) { case (?value) if (series.availability != value) return false; case (_) {} };
+            switch (request.status) { case (?value) if (statusText(item.status) != value) return false; case (_) {} };
+            switch (request.recurring) { case (?value) if ((series.recurrence != null) != value) return false; case (_) {} };
+            if (needle == "") return true;
+            let view = occurrenceView(item);
+            Text.contains(Text.toLower(view.title), #text needle) or Text.contains(Text.toLower(view.notes), #text needle) or Text.contains(Text.toLower(view.location), #text needle)
+        };
         func overlapsLiveHold(start : Nat64, finish : Nat64, ignoredId : ?Nat64) : Bool { let now = nowNs(); Array.any<Memory.Occurrence>(mem.occurrences, func(item) { let ignored = switch (ignoredId) { case (?id) item.id == id; case null false }; not ignored and (switch (item.status) { case (#hold(expires)) expires > now; case (_) false }) and start < item.end_ns and item.start_ns < finish }) };
         func activeOccurrences() : [Memory.Occurrence] { let now = nowNs(); Array.filter<Memory.Occurrence>(mem.occurrences, func(item) { switch (item.status) { case (#cancelled) false; case (#hold(expires)) expires > now; case (_) true } }) };
         func findSeries(id : Nat64) : ?(Nat, Memory.EventSeries) { var index = 0; while (index < mem.series.size()) { if (mem.series[index].id == id) return ?(index, mem.series[index]); index += 1 }; null };
@@ -234,7 +367,7 @@ module {
             switch (requested) { case (?value) ?value; case null existing }
         };
         func seriesView(item : Memory.EventSeries) : SeriesView { { id = item.id; revision = item.revision; title = item.title; notes = item.notes; location = item.location; color = item.color; availability = item.availability; kind = item.kind; source = sourceText(item.source); time_zone = item.time_zone; recurrence = item.recurrence; created_at_ns = item.created_at_ns; updated_at_ns = item.updated_at_ns } };
-        func occurrenceView(item : Memory.Occurrence) : OccurrenceView { let ?(_, series) = findSeries(item.series_id) else { return { id = item.id; revision = item.revision; series_id = item.series_id; series_revision = 0; recurrence_key = item.recurrence_key; start_ns = item.start_ns; end_ns = item.end_ns; title = "Missing series"; notes = ""; location = ""; color = "sage"; availability = #free; kind = #timed; source = "corrupt"; status = "corrupt" } }; { id = item.id; revision = item.revision; series_id = series.id; series_revision = series.revision; recurrence_key = item.recurrence_key; start_ns = item.start_ns; end_ns = item.end_ns; title = switch (item.title_override) { case (?value) value; case null series.title }; notes = switch (item.notes_override) { case (?value) value; case null series.notes }; location = switch (item.location_override) { case (?value) value; case null series.location }; color = series.color; availability = series.availability; kind = series.kind; source = sourceText(series.source); status = statusText(item.status) } };
+        func occurrenceView(item : Memory.Occurrence) : OccurrenceView { let ?(_, series) = findSeries(item.series_id) else { return { id = item.id; revision = item.revision; series_id = item.series_id; series_revision = 0; recurrence_key = item.recurrence_key; start_ns = item.start_ns; end_ns = item.end_ns; title = "Missing series"; notes = ""; location = ""; color = "sage"; availability = #free; kind = #timed; source = "corrupt"; status = "corrupt"; time_zone = "UTC" } }; { id = item.id; revision = item.revision; series_id = series.id; series_revision = series.revision; recurrence_key = item.recurrence_key; start_ns = item.start_ns; end_ns = item.end_ns; title = switch (item.title_override) { case (?value) value; case null series.title }; notes = switch (item.notes_override) { case (?value) value; case null series.notes }; location = switch (item.location_override) { case (?value) value; case null series.location }; color = series.color; availability = series.availability; kind = series.kind; source = sourceText(series.source); status = statusText(item.status); time_zone = series.time_zone } };
         func legacyView(item : Memory.Occurrence) : EventView { let view = occurrenceView(item); { id = view.id; revision = view.revision; start_ns = view.start_ns; end_ns = view.end_ns; title = view.title; notes = view.notes; source = view.source; status = view.status; hold_expires_at_ns = switch (item.status) { case (#hold(expires)) ?expires; case (_) null } } };
         func sourceText(value : Memory.SeriesSource) : Text { switch (value) { case (#owner) "owner"; case (#rendezvous(_)) "rendezvous" } };
         func statusText(value : Memory.OccurrenceStatus) : Text { switch (value) { case (#normal) "normal"; case (#overridden) "overridden"; case (#cancelled) "cancelled"; case (#hold(_)) "hold"; case (#confirmed) "confirmed" } };
@@ -265,6 +398,12 @@ public type calendar_series_get_v2_Output = ?SeriesView;
 public type calendar_series_occurrences_v2_Input = (request : SeriesOccurrencesRequest);
 public type calendar_series_occurrences_v2_Output = SeriesOccurrencesPage;
 
+public type calendar_export_v1_Input = (request : ExportRequestV1);
+public type calendar_export_v1_Output = ExportPageV1;
+
+public type calendar_search_v1_Input = (wire : Text);
+public type calendar_search_v1_Output = SearchResultV1;
+
 public type calendar_series_create_v2_Input = (request : SeriesCreateRequest);
 public type calendar_series_create_v2_Output = SeriesResult;
 
@@ -294,6 +433,9 @@ public type calendar_preferences_get_Output = PreferencesView;
 
 public type calendar_preferences_set_Input = (request : PreferencesSetRequest);
 public type calendar_preferences_set_Output = PreferencesResult;
+
+public type calendar_find_free_v1_Input = (request : AvailabilityRequestV1);
+public type calendar_find_free_v1_Output = AvailabilityResultV1;
 
 public type calendar_availability_v1_Input = (request : AvailabilityRequestV1);
 public type calendar_availability_v1_Output = AvailabilityResultV1;

@@ -5,16 +5,19 @@ import { validate_neutron_conf } from "neutron-tools/src/validate_schema.js";
 
 const manifestUrl = new URL("../neutron.json", import.meta.url);
 
-test("Calendar 0.2.0 exposes bounded owner v2 and scheduling dependency APIs", async () => {
+test("Calendar 0.3.0 exposes bounded owner, export, search, and scheduling APIs", async () => {
   const manifest = JSON.parse(await readFile(manifestUrl, "utf8")) as NeutronManifest;
   expect(validate_neutron_conf(manifest).valid).toBe(true);
   expect(manifest).toMatchObject({
     id: "calendar",
     name: "Calendar",
-    version: 200,
+    version: 300,
+    update_source: "233tv-xiaaa-aaaay-aacta-cai",
     func: {
       calendar_status: { type: "query", async: false },
       calendar_range_v2: { type: "query", async: false },
+      calendar_export_v1: { type: "query", async: false },
+      calendar_search_v1: { type: "query", async: false },
       calendar_series_create_v2: { type: "update", async: false },
     },
     memory: {
@@ -25,8 +28,11 @@ test("Calendar 0.2.0 exposes bounded owner v2 and scheduling dependency APIs", a
       },
     },
   });
-  expect(manifest).not.toHaveProperty("update_source");
+  expect(manifest).not.toHaveProperty("backend.capabilities.certified_assets");
+  expect(manifest).not.toHaveProperty("capabilities.certified_assets");
+  expect(manifest.memory).not.toHaveProperty("calendar_exports");
   expect(manifest).not.toHaveProperty("init_arg");
+  expect(manifest).toMatchObject({ background: { path: "service.html" } });
   const exported = Object.entries(manifest.func).filter(([, value]) => value.type === "internal").map(([name]) => name).sort();
   expect(exported).toEqual(["calendar_availability_v1", "calendar_confirm_v1", "calendar_release_v1", "calendar_reserve_v1"]);
   const migration = await readFile(new URL("../backend/memory/calendar/v1_to_v2.mo", import.meta.url), "utf8");
@@ -51,12 +57,23 @@ test("Calendar tile uses source-bound CRUD and renders all event origins", async
   expect(frontend).toContain("eventResize={resizeEvent}");
   expect(frontend).toContain("fc-event--hold");
   expect(frontend).toContain("fc-event--rendezvous");
+  expect(frontend).toContain("Tentative Rendezvous hold");
+  expect(frontend).toContain("Scheduled through Rendezvous");
   expect(frontend).toContain('type="date"');
   expect(frontend).toContain('Repeat');
   expect(frontend).toContain('This event');
   expect(frontend).toContain('Entire series');
   expect(frontend).toContain('openAppTile({ appId: "rendezvous"');
   expect(frontend).toContain('Find a time with someone');
+  expect(frontend).toContain('target: "app:files:background"');
+  expect(frontend).toContain('name: "write"');
+  expect(frontend).toContain("copyToClipboard(preparedExport.contents)");
+  expect(frontend).toContain('openAppTile({ appId: "files"');
+  const service = await readFile(new URL("../src/service.ts", import.meta.url), "utf8");
+  expect(service).toContain('registerTool("status"');
+  expect(service).toContain("exposeTool(name, options, handler)");
+  expect(service).toContain('registerTool("create_event"');
+  expect(service).toContain('context.kernel.updateSelf<JsonValue>');
 });
 
 test("Calendar bundles the Neutron design system", async () => {
@@ -78,6 +95,6 @@ test("Calendar bundles only MIT FullCalendar standard views and fits the portal 
   expect(Object.keys(packageJson.dependencies).some((name) => name.includes("resource") || name.includes("premium"))).toBe(false);
   const notice = await readFile(new URL("../dist/web/THIRD_PARTY_NOTICES.txt", import.meta.url), "utf8");
   expect(notice).toContain("SPDX-License-Identifier: MIT");
-  const archive = await stat(new URL("../calendar.v0.2.0.neutron", import.meta.url));
+  const archive = await stat(new URL("../calendar.v0.3.0.neutron", import.meta.url));
   expect(archive.size).toBeLessThanOrEqual(1_900_000);
 });
