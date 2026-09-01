@@ -1,5 +1,5 @@
 import Availability "../backend/AvailabilityV2";
-import Memory "../backend/memory/calendar/v3";
+import Memory "../backend/memory/calendar/v4";
 import Nat64 "mo:core/Nat64";
 
 func at(value : Nat) : Nat64 { Nat64.fromNat(value) * 60_000_000_000 };

@@ -15,11 +15,16 @@
         "3": {
           "hash": "837ec1952dd080b3fc418c2bbd332bb0d79f16345b2f02a97c60622f9530c916",
           "entry": "837ec1952dd080b3fc418c2bbd332bb0d79f16345b2f02a97c60622f9530c916"
+        },
+        "4": {
+          "hash": "0551792bd3569af90f86832b883bb379841ffee86cdb6aa2c57ab14677f3b66f",
+          "entry": "0551792bd3569af90f86832b883bb379841ffee86cdb6aa2c57ab14677f3b66f"
         }
       },
       "migrations": {
         "1->2": "545311aa327c20e4a29010d807172c224f38d5e799d9686c0bbe3e52214bf5fd",
-        "2->3": "2fdf59e28dfb0654092b452a495f24a1678b62a74d61059885a157abacda6818"
+        "2->3": "2fdf59e28dfb0654092b452a495f24a1678b62a74d61059885a157abacda6818",
+        "3->4": "920591286652dbaffcc523c353d477aaf11e5aaa210b02795b3c87ed727354a7"
       }
     }
   }

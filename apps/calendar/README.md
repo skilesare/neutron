@@ -57,8 +57,8 @@ files from the same Calendar can also correlate those event identifiers. UIDs
 contain no principal, authorization data, installation UID, or private event
 text.
 
-The serializer has deterministic golden tests and is parsed by `ical.js` in
-tests only. The parser is not included in the Calendar application bundle.
+The serializer has deterministic golden tests and is independently parsed by
+`ical.js` during qualification.
 
 Because an installed app tile is intentionally not allowed to start browser
 downloads, Calendar hands the generated snapshot to the existing Files app as
@@ -77,6 +77,31 @@ unchanged, requires no Kernel modification, and remains independently
 installable. Files supplies the optional file/download boundary without gaining
 access to Calendar's stored event database.
 
+## iCalendar import
+
+The owner can choose a `.ics` file up to 1 MiB and review it before Calendar
+changes any state. Parsing runs locally in a killable worker with explicit
+limits on lines, properties, components, event series, text fields, recurrence
+expansion, and resulting occurrences. Calendar supports the same core VEVENT
+surface used by its exports, including UTC, floating and all-day values, TZID,
+RRULE/RDATE, EXDATE, RECURRENCE-ID, UID, SEQUENCE, SUMMARY, DESCRIPTION,
+LOCATION, STATUS, and TRANSP. Scheduling METHOD files, attendees, organizers,
+attachments, request status, and alarms are rejected or reported instead of
+being silently reinterpreted.
+
+Preview groups entries as create, update, unchanged, conflict, duplicate,
+skipped, or invalid. Imported series are matched by normalized source namespace
+plus UID—not by title—and SEQUENCE plus a deterministic content digest prevents
+older or conflicting data from overwriting newer state. The owner can select
+individual creates and updates and sees the exact backend mutation count.
+
+One revision-guarded call validates and commits the complete selected batch, up
+to 250 series and 2,000 occurrences. Any stale or invalid item rejects the whole
+batch. Calendar retains the 20 newest bounded receipts so an interrupted caller
+can reconcile a batch ID and digest without retrying blindly. Undo restores the
+exact preimage only when no affected series has been edited since; otherwise it
+lists the conflicting series and leaves every later owner change intact.
+
 ## Neutron Agent tools
 
 Calendar declares an ordinary resident endpoint with bounded semantic tools for
@@ -87,6 +112,13 @@ does not receive raw Motoko variants or nanoseconds, and export never dumps an
 entire private calendar into model context. Tool instructions explicitly keep
 private Calendar data out of public web-search requests and require read/search
 reconciliation after an ambiguous write outcome.
+
+The resident also exposes attachment-aware import preview, commit, status, and
+undo tools. The `.ics` bytes are delivered directly to Calendar and parsed
+locally. Agent receives only compact UID/title/start/count/category summaries;
+raw file contents, notes, locations, unrelated events, batch bytes, and private
+Calendar storage are not placed in model text. Preview tokens expire after ten
+minutes.
 
 Key bounds: 2,000 stored occurrences, 730 occurrences/series, 100 search
 results/page, 2,000 scanned occurrences/search call, 32 availability
@@ -102,4 +134,4 @@ npm --workspace neutron-calendar test
 
 The package pipeline validates, builds, locks managed memory, creates method
 schemas, runs recurrence/domain/migration suites, and produces
-`apps/calendar/calendar.v0.4.0.neutron`.
+`apps/calendar/calendar.v0.5.0.neutron`.

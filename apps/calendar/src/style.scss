@@ -30,6 +30,22 @@
   .export-publication { background: var(--nt-surface); border: 1px solid var(--nt-border); border-radius: var(--nt-radius-sm); display: grid; gap: var(--nt-gap-3); padding: var(--nt-pad-3); }
   .export-publication p { margin: 0; overflow-wrap: anywhere; }
   .export-publication input[readonly] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .78rem; }
+  .import-preview { display: grid; gap: var(--nt-gap-3); }
+  .import-summary { align-items: baseline; display: flex; gap: var(--nt-gap-2); justify-content: space-between; }
+  .import-summary span { color: var(--nt-text-muted); font-size: var(--nt-font-size-meta); }
+  .import-preview ol { display: grid; gap: var(--nt-gap-2); list-style: none; margin: 0; max-height: 32rem; overflow: auto; padding: 0; }
+  .import-diagnostics { background: color-mix(in srgb, #e4c667 10%, var(--nt-surface)); border-left: 3px solid #e4c667; color: var(--nt-text-muted); display: grid; font-size: var(--nt-font-size-meta); gap: .35rem; margin: 0; padding: var(--nt-pad-3) var(--nt-pad-3) var(--nt-pad-3) 1.8rem; }
+  .import-item { background: var(--nt-surface); border: 1px solid var(--nt-border); border-left: 3px solid var(--nt-border-strong); border-radius: var(--nt-radius-sm); display: grid; gap: .45rem; padding: var(--nt-pad-3); }
+  .import-item--create, .import-item--update { border-left-color: var(--nt-accent); }
+  .import-item--conflict, .import-item--duplicate, .import-item--invalid { border-left-color: #e4c667; }
+  .import-item > label { align-items: start; color: var(--nt-text); cursor: pointer; display: flex; gap: var(--nt-gap-2); }
+  .import-item > label input { accent-color: var(--nt-accent); height: 1rem; margin-top: .2rem; padding: 0; width: 1rem; }
+  .import-item > label span { display: grid; min-width: 0; }
+  .import-item strong { overflow-wrap: anywhere; }
+  .import-item small, .import-item time, .import-item p, .import-item details { color: var(--nt-text-muted); font-size: var(--nt-font-size-meta); }
+  .import-item p { margin: 0; }
+  .import-item details p { margin-top: .4rem; }
+  .import-item code { display: block; margin-top: .4rem; overflow-wrap: anywhere; }
   .editor .inline-check input, .editor .scope-picker input { accent-color: var(--nt-accent); height: 1rem; margin: 0; padding: 0; width: 1rem; }
   .recurrence-editor { background: color-mix(in srgb, var(--nt-surface) 82%, transparent); border: 1px solid var(--nt-border); border-radius: var(--nt-radius-sm); display: grid; gap: var(--nt-gap-3); padding: var(--nt-pad-3); }
   .recurrence-editor fieldset, .scope-picker { border: 0; display: grid; gap: var(--nt-gap-2); margin: 0; padding: 0; }

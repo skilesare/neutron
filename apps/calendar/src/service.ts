@@ -1,5 +1,8 @@
-import { exposeTool, isJsonObject, type ExposedToolOptions, type JsonObject, type JsonValue, type MsgBusToolHandler } from "neutron-tools/app";
+import { exposeTool, isJsonObject, querySelf, updateSelf, type ExposedToolOptions, type JsonObject, type JsonValue, type MsgBusToolHandler } from "neutron-tools/app";
+import { exposeAttachmentTool } from "neutron-tools/src/app_attachments.js";
 import { formatInstantForEditor, isValidTimeZone } from "./time_zone";
+import { parseIcsFileInWorker } from "./ics_import_client";
+import { buildImportPreview, bytesHex, importPreviewDigest, importSeriesWire, type ImportIndexEntry, type ImportPreview } from "./ics_import_preview";
 import { materializeRecurrence, type RecurrenceDraft, type RepeatFrequency } from "./recurrence";
 import { encodeCalendarSearchWire } from "./search_wire";
 
@@ -23,6 +26,7 @@ const recurrenceSchema: JsonObject = objectSchema(["frequency", "interval", "end
 });
 
 export const calendarToolHandlers: Record<string, MsgBusToolHandler> = {};
+const agentImportPreviews = new Map<string, { preview: ImportPreview; expiresAt: number }>();
 
 function registerTool(name: string, options: ExposedToolOptions, handler: MsgBusToolHandler): void {
   calendarToolHandlers[name] = handler;
@@ -125,7 +129,59 @@ registerTool("export_event", {
   title: "Export Calendar Event", description: "Prepare a privacy-safe owner action for exporting an event. This tool never puts private iCalendar contents into model text; the owner opens Calendar and uses Export event.", inputSchema: objectSchema(["seriesId", "occurrenceId"], { seriesId: decimalSchema, occurrenceId: decimalSchema }), outputSchema: objectSchema(["seriesId", "occurrenceId", "action", "instructions"], { seriesId: decimalSchema, occurrenceId: decimalSchema, action: { const: "open_calendar_export" }, instructions: { type: "string" } }), annotations: { "neutron:effects": ["read"] },
 }, async (args, context) => { const seriesId = requiredNat(args.seriesId, "seriesId"); const occurrenceId = requiredNat(args.occurrenceId, "occurrenceId"); const raw = record(await context.kernel.querySelf<JsonValue>("calendar_series_occurrences_v2", [{ series_id: seriesId, offset: "0", limit: "730" }], QUERY_TIMEOUT), "occurrences"); if (!array(raw.occurrences, "occurrences").some((value) => nat(record(value, "occurrence").id, "id") === occurrenceId)) throw new Error("Event not found."); return { seriesId, occurrenceId, action: "open_calendar_export", instructions: "Open Calendar, select this event, and choose Export event. Choose whether the downloaded .ics file includes private titles, notes, and locations." }; });
 
+exposeAttachmentTool("preview_ics_import", {
+  title: "Preview iCalendar Import", description: "Parse one attached .ics file inside Calendar and return compact create/update/conflict summaries. Raw file contents, notes, locations, and unrelated Calendar data are not returned to the Agent. This does not mutate Calendar.",
+  inputSchema: objectSchema([], { defaultTimeZone: zoneSchema }),
+  outputSchema: objectSchema(["previewToken", "revision", "source", "counts", "items", "diagnostics", "expiresInSeconds"], { previewToken: { type: "string" }, revision: decimalSchema, source: { type: "string" }, counts: { type: "object" }, items: { type: "array", maxItems: 250, items: { type: "object" } }, diagnostics: { type: "array", maxItems: 250, items: { type: "string" } }, expiresInSeconds: { type: "integer" } }),
+  annotations: { "neutron:effects": ["read"] }, attachments: { version: 1, input: { name: "calendar", mediaTypes: ["text/calendar", "application/octet-stream"], maxBytes: 1_048_576, required: true } },
+}, async (args, attachments) => {
+  const attachment = attachments[0]; if (!attachment) throw new Error("Attach one .ics file.");
+  const preferences = record(await querySelf<JsonValue>("calendar_preferences_get", [null], QUERY_TIMEOUT), "preferences");
+  const zone = optionalText(args.defaultTimeZone) ?? text(preferences.display_time_zone, "time zone"); if (!isValidTimeZone(zone)) throw new Error("defaultTimeZone must be a valid IANA time zone.");
+  const file = new File([attachment.data], attachment.name, { type: attachment.mediaType });
+  const parsed = await parseIcsFileInWorker(file, zone);
+  const index = await querySelf<{ revision: string; entries: ImportIndexEntry[] }>("calendar_import_index_v1", [{ source_namespace: parsed.sourceNamespace, external_uids: parsed.series.map((series) => series.uid) }], QUERY_TIMEOUT);
+  const preview = buildImportPreview(parsed, index); const token = randomHex(16); const expiresInSeconds = 600;
+  for (const [key, value] of agentImportPreviews) if (value.expiresAt <= Date.now()) agentImportPreviews.delete(key);
+  agentImportPreviews.set(token, { preview, expiresAt: Date.now() + expiresInSeconds * 1_000 });
+  const counts = Object.fromEntries(["create", "update", "unchanged", "conflict", "duplicate", "skipped", "invalid"].map((category) => [category, preview.items.filter((item) => item.category === category).length + preview.rejected.filter((item) => item.category === category).length]));
+  return { value: { previewToken: token, revision: preview.revision, source: preview.sourceNamespace, counts, items: preview.items.map((item) => ({ uid: item.uid, title: item.series.occurrences[0]?.title ?? "Untitled event", firstStart: item.series.occurrences[0]?.startIso ?? null, timeZone: item.series.occurrences[0]?.timeZone ?? zone, occurrenceCount: item.series.occurrences.length, category: item.category, selectable: item.category === "create" || item.category === "update", reason: item.reason })), diagnostics: preview.diagnostics.map((item) => `${item.code}: ${item.message}${item.uid ? ` (${item.uid})` : ""}`), expiresInSeconds } };
+});
+
+registerTool("commit_ics_import", {
+  title: "Commit Reviewed iCalendar Import", description: "Atomically commit selected create/update items from an unexpired preview token. Use only UIDs marked selectable by preview_ics_import. On an ambiguous response, do not retry blindly; this tool reconciles the durable receipt before returning.",
+  inputSchema: objectSchema(["previewToken", "selectedUids"], { previewToken: { type: "string", minLength: 32, maxLength: 32 }, selectedUids: { type: "array", minItems: 1, maxItems: 250, uniqueItems: true, items: { type: "string", minLength: 1, maxLength: 512 } } }), outputSchema: objectSchema(["committed", "batchId", "previewDigest", "revision", "changeCount", "reconciliation"], { committed: { const: true }, batchId: { type: "string" }, previewDigest: { type: "string" }, revision: decimalSchema, changeCount: { type: "integer" }, reconciliation: { type: "string" } }), annotations: { "neutron:effects": ["write"] },
+}, async (args) => {
+  const token = requiredText(args.previewToken, "previewToken"); const stored = agentImportPreviews.get(token); if (!stored || stored.expiresAt <= Date.now()) { agentImportPreviews.delete(token); throw new Error("Import preview expired; attach the file and preview it again."); }
+  const selected = new Set(array(args.selectedUids, "selectedUids").map((value) => requiredText(value, "selected UID")));
+  const chosen = stored.preview.items.filter((item) => selected.has(item.uid) && (item.category === "create" || item.category === "update"));
+  if (chosen.length !== selected.size) throw new Error("Every selected UID must be a selectable create or update from this preview.");
+  const batchId = crypto.getRandomValues(new Uint8Array(16)); const previewDigest = await importPreviewDigest(stored.preview, selected);
+  const request = { expected_revision: stored.preview.revision, batch_id: batchId, preview_digest: previewDigest, source_namespace: stored.preview.sourceNamespace, series: chosen.map(importSeriesWire) };
+  try {
+    const result = record(await updateSelf<JsonValue>("calendar_import_commit_v1", [request], WRITE_TIMEOUT), "import result");
+    if ("err" in result) mutationOk(result, "import");
+    const receipt = record(result.committed ?? result.already_committed, "import receipt"); agentImportPreviews.delete(token);
+    return { committed: true, batchId: bytesHex(batchId), previewDigest: bytesHex(previewDigest), revision: nat(receipt.committed_revision, "revision"), changeCount: integer(receipt.change_count, "change count"), reconciliation: "The durable receipt confirms the entire selected batch committed." };
+  } catch (error) {
+    const status = record(await querySelf<JsonValue>("calendar_bulk_status_v1", [{ batch_id: batchId, preview_digest: previewDigest }], QUERY_TIMEOUT), "import status");
+    if (!("committed" in status)) throw error;
+    const receipt = record(status.committed, "import receipt"); agentImportPreviews.delete(token);
+    return { committed: true, batchId: bytesHex(batchId), previewDigest: bytesHex(previewDigest), revision: nat(receipt.committed_revision, "revision"), changeCount: integer(receipt.change_count, "change count"), reconciliation: "Dispatch was interrupted, but the durable receipt confirms the entire selected batch committed." };
+  }
+});
+
+registerTool("ics_import_status", {
+  title: "iCalendar Import Status", description: "Reconcile an iCalendar import by the batch ID and preview digest returned from commit_ics_import.", inputSchema: objectSchema(["batchId", "previewDigest"], { batchId: { type: "string", pattern: "^[a-f0-9]{32,64}$" }, previewDigest: { type: "string", pattern: "^[a-f0-9]{64}$" } }), outputSchema: { type: "object" }, annotations: { "neutron:effects": ["read"] },
+}, async (args, context) => context.kernel.querySelf<JsonValue>("calendar_bulk_status_v1", [{ batch_id: parseHex(requiredText(args.batchId, "batchId")), preview_digest: parseHex(requiredText(args.previewDigest, "previewDigest")) }], QUERY_TIMEOUT));
+
+registerTool("undo_ics_import", {
+  title: "Undo iCalendar Import", description: "Undo one committed import only if no affected series has been edited since. Calendar refuses rather than overwrite later owner changes.", inputSchema: objectSchema(["batchId", "previewDigest"], { batchId: { type: "string", pattern: "^[a-f0-9]{32,64}$" }, previewDigest: { type: "string", pattern: "^[a-f0-9]{64}$" } }), outputSchema: { type: "object" }, annotations: { "neutron:effects": ["write"] },
+}, async (args, context) => context.kernel.updateSelf<JsonValue>("calendar_bulk_undo_v1", [{ batch_id: parseHex(requiredText(args.batchId, "batchId")), preview_digest: parseHex(requiredText(args.previewDigest, "previewDigest")) }], WRITE_TIMEOUT));
+
 function objectSchema(required: string[], properties: JsonObject): JsonObject { return { type: "object", required, properties, additionalProperties: false }; }
+function randomHex(bytes: number): string { return bytesHex(crypto.getRandomValues(new Uint8Array(bytes))); }
+function parseHex(value: string): Uint8Array { if (!/^[a-f0-9]+$/u.test(value) || value.length % 2 !== 0) throw new Error("Expected lowercase hexadecimal bytes."); return Uint8Array.from({ length: value.length / 2 }, (_, index) => Number.parseInt(value.slice(index * 2, index * 2 + 2), 16)); }
 function record(value: unknown, label: string): JsonObject { if (!isJsonObject(value)) throw new Error(`${label} returned invalid data.`); return value as JsonObject; }
 function recordValue(value: JsonValue): JsonObject { return record(value, "Calendar"); }
 function array(value: JsonValue | undefined, label: string): JsonValue[] { if (!Array.isArray(value)) throw new Error(`${label} must be an array.`); return value; }

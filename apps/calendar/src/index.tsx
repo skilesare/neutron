@@ -10,6 +10,8 @@ import { cx, nt } from "neutron-design-system";
 import { callTool, copyToClipboard, openAppTile, querySelf, updateSelf, type JsonValue } from "neutron-tools/app";
 import { KERNEL_RUNTIME_CONFIG_PATH, parseKernelRuntimeConfig } from "neutron-tools/src/runtime_config.js";
 import { safeIcsFilename, serializeIcs, type IcsEvent } from "./ics";
+import { parseIcsFileInWorker } from "./ics_import_client";
+import { buildImportPreview, importPreviewDigest, importSeriesWire, type ImportIndexEntry, type ImportPreview } from "./ics_import_preview";
 import { encodeCalendarSearchWire } from "./search_wire";
 import { materializeRecurrence, repeatSummary, type RecurrenceDraft, type RepeatFrequency } from "./recurrence";
 import { meetingView, scheduleView } from "./rendezvous_handoff";
@@ -18,10 +20,11 @@ import "./style.scss";
 
 type OccurrenceView = { id: string; revision: string; series_id: string; series_revision: string; recurrence_key: string; start_ns: string; end_ns: string; title: string; notes: string; location: string; color: string; availability: JsonValue; kind: JsonValue; source: string; status: string; time_zone: string };
 type RangePage = { revision: string; total: string; occurrences: OccurrenceView[] };
-type SeriesView = { id: string; revision: string; title: string; notes: string; location: string; color: string; availability: JsonValue; kind: JsonValue; source: string; time_zone: string; recurrence: JsonValue };
+type SeriesView = { id: string; revision: string; title: string; notes: string; location: string; color: string; availability: JsonValue; kind: JsonValue; source: string; imported: boolean; time_zone: string; recurrence: JsonValue };
 type ExportRow = { occurrence: OccurrenceView; series_updated_at_ns: string; time_zone: string };
 type ExportPage = { revision: string; total: string; occurrences: ExportRow[] };
 type PreparedExport = { path: string | null; filename: string; bodyBytes: number; contents: string };
+type ImportReceipt = { batchId: Uint8Array; previewDigest: Uint8Array; committedRevision: string; changeCount: number; undone: boolean };
 type SearchPage = { revision: string; scanned: string; occurrences: OccurrenceView[]; next_offset: JsonValue };
 type SearchFilters = { text: string; source: "any" | "owner" | "rendezvous"; availability: "any" | "busy" | "free"; recurring: "any" | "yes" | "no"; from: string; through: string };
 type Preferences = { revision: string; day_start_minute: number; day_end_minute: number; allowed_weekdays_mask: number; slot_increment_minutes: number; buffer_before_minutes: number; buffer_after_minutes: number; display_time_zone: string };
@@ -72,6 +75,7 @@ export const App = () => {
   const [message, setMessage] = useState("Loading your calendar…"); const [busy, setBusy] = useState(false); const [deleteArmed, setDeleteArmed] = useState(false);
   const [exportDetails, setExportDetails] = useState(true); const [exportHolds, setExportHolds] = useState(false);
   const [preparedExport, setPreparedExport] = useState<PreparedExport | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null); const [importSelected, setImportSelected] = useState<Set<string>>(new Set()); const [importFilename, setImportFilename] = useState(""); const [importReceipt, setImportReceipt] = useState<ImportReceipt | null>(null);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>({ text: "", source: "any", availability: "any", recurring: "any", from: "", through: "" });
   const [searchResults, setSearchResults] = useState<OccurrenceView[]>([]); const [searchRevision, setSearchRevision] = useState<string | null>(null); const [searchCursor, setSearchCursor] = useState<string | null>(null); const [searchState, setSearchState] = useState<"idle" | "loading" | "ready" | "stale" | "error">("idle"); const [searchError, setSearchError] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -104,7 +108,7 @@ export const App = () => {
       const [series, occurrences] = await Promise.all([querySelf<SeriesView | null>("calendar_series_get_v2", [{ series_id: item.series_id }]), querySelf<RangePage>("calendar_series_occurrences_v2", [{ series_id: item.series_id, offset: "0", limit: "730" }])]);
       if (!series) throw new Error("Series not found"); const allDay = variantName(series.kind) === "all_day"; const first = occurrences.occurrences.filter((value) => value.status !== "cancelled").sort((a, b) => a.start_ns.localeCompare(b.start_ns))[0] ?? item;
       const hasRecurrence = optionalRecord(series.recurrence) !== null;
-      beginDraft({ occurrenceId: item.id, occurrenceRevision: item.revision, seriesId: item.series_id, seriesRevision: series.revision, source: series.source, status: item.status, title: item.title, start: localInput(fromNs(item.start_ns), activeZone, allDay), end: localInput(fromNs(item.end_ns), activeZone, allDay), notes: item.notes, location: item.location, color: item.color, availability: variantName(item.availability) === "free" ? "free" : "busy", allDay, recurrence: recurrenceFromSeries(series, fromNs(first.start_ns), activeZone), editScope: hasRecurrence ? "occurrence" : "series", anchorStart: localInput(fromNs(first.start_ns), activeZone, allDay), anchorEnd: localInput(fromNs(first.end_ns), activeZone, allDay) });
+      beginDraft({ occurrenceId: item.id, occurrenceRevision: item.revision, seriesId: item.series_id, seriesRevision: series.revision, source: series.imported ? "import" : series.source, status: item.status, title: item.title, start: localInput(fromNs(item.start_ns), activeZone, allDay), end: localInput(fromNs(item.end_ns), activeZone, allDay), notes: item.notes, location: item.location, color: item.color, availability: variantName(item.availability) === "free" ? "free" : "busy", allDay, recurrence: recurrenceFromSeries(series, fromNs(first.start_ns), activeZone), editScope: series.imported || hasRecurrence ? "occurrence" : "series", anchorStart: localInput(fromNs(first.start_ns), activeZone, allDay), anchorEnd: localInput(fromNs(first.end_ns), activeZone, allDay) });
     } catch (error) { setMessage(errorText(error)); }
   };
   const seriesValue = (current: EditorDraft) => { const materialized = materializeRecurrence(current.start, current.end, current.allDay, current.recurrence, activeZone); if (materialized.error) throw new Error(materialized.error); return { title: current.title.trim(), notes: current.notes, location: current.location, color: current.color, availability: { [current.availability]: null }, kind: { [current.allDay ? "all_day" : "timed"]: null }, time_zone: activeZone, recurrence: materialized.recurrence, occurrences: materialized.occurrences }; };
@@ -217,6 +221,62 @@ export const App = () => {
       setMessage(`Could not export calendar. ${errorText(error)}`);
     } finally { setBusy(false); }
   };
+  const loadImportFile = async (file: File | null) => {
+    if (!file) return;
+    setBusy(true); setImportPreview(null); setImportSelected(new Set()); setImportReceipt(null); setImportFilename(file.name);
+    try {
+      if (!file.name.toLowerCase().endsWith(".ics")) throw new Error("Choose a file whose name ends in .ics.");
+      if (file.size > 1_048_576) throw new Error("iCalendar imports are limited to 1 MiB.");
+      if (file.type && file.type !== "text/calendar" && file.type !== "application/octet-stream") throw new Error(`Unsupported file media type ${file.type}. Choose a text/calendar .ics file.`);
+      const parsed = await parseIcsFileInWorker(file, activeZone);
+      const index = await querySelf<{ revision: string; entries: ImportIndexEntry[] }>("calendar_import_index_v1", [{ source_namespace: parsed.sourceNamespace, external_uids: parsed.series.map((series) => series.uid) }]);
+      const preview = buildImportPreview(parsed, index);
+      setImportPreview(preview); setImportSelected(new Set(preview.items.filter((item) => item.selected).map((item) => item.uid)));
+      const actionable = preview.items.filter((item) => item.category === "create" || item.category === "update").length;
+      setMessage(`Reviewed ${parsed.series.length} series from ${file.name}. ${actionable} can be selected for import; no changes have been made.`);
+    } catch (error) { setMessage(`Could not review ${file.name}. ${errorText(error)}`); }
+    finally { setBusy(false); }
+  };
+  const toggleImport = (uid: string) => setImportSelected((current) => { const next = new Set(current); if (next.has(uid)) next.delete(uid); else next.add(uid); return next; });
+  const commitImport = async () => {
+    if (!importPreview) return;
+    const chosen = importPreview.items.filter((item) => importSelected.has(item.uid) && (item.category === "create" || item.category === "update"));
+    if (!chosen.length) return;
+    setBusy(true);
+    const batchId = crypto.getRandomValues(new Uint8Array(16));
+    const previewDigest = await importPreviewDigest(importPreview, importSelected);
+    const request = { expected_revision: importPreview.revision, batch_id: batchId, preview_digest: previewDigest, source_namespace: importPreview.sourceNamespace, series: chosen.map(importSeriesWire) };
+    try {
+      let result = await updateSelf<JsonValue>("calendar_import_commit_v1", [request]);
+      if (typeof result !== "object" || result === null || Array.isArray(result)) throw new Error("Calendar returned an invalid import receipt.");
+      if ("err" in result) throw new Error(resultError(result) ?? "Import was rejected.");
+      const raw = "committed" in result ? result.committed : "already_committed" in result ? result.already_committed : null;
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("Calendar returned an invalid import receipt.");
+      const receipt = raw as Record<string, JsonValue>;
+      setImportReceipt({ batchId, previewDigest, committedRevision: String(receipt.committed_revision), changeCount: Number(receipt.change_count), undone: false });
+      setImportPreview(null); setImportSelected(new Set()); await refresh(); setMessage(`Imported ${chosen.length} event series atomically. You can undo this exact batch until any imported item is edited.`);
+    } catch (error) {
+      try {
+        const status = await querySelf<JsonValue>("calendar_bulk_status_v1", [{ batch_id: batchId, preview_digest: previewDigest }]);
+        if (typeof status === "object" && status !== null && !Array.isArray(status) && "committed" in status && typeof status.committed === "object" && status.committed !== null && !Array.isArray(status.committed)) {
+          const receipt = status.committed as Record<string, JsonValue>;
+          setImportReceipt({ batchId, previewDigest, committedRevision: String(receipt.committed_revision), changeCount: Number(receipt.change_count), undone: false });
+          setImportPreview(null); setImportSelected(new Set()); await refresh(); setMessage("The import response was interrupted, but its durable receipt confirms the complete batch committed.");
+        } else throw error;
+      } catch { setMessage(`Import did not produce a matching receipt. Nothing should be retried blindly. ${errorText(error)}`); }
+    } finally { setBusy(false); }
+  };
+  const undoImport = async () => {
+    if (!importReceipt || importReceipt.undone) return;
+    setBusy(true);
+    try {
+      const result = await updateSelf<JsonValue>("calendar_bulk_undo_v1", [{ batch_id: importReceipt.batchId, preview_digest: importReceipt.previewDigest }]);
+      const problem = resultError(result); if (problem) throw new Error(problem);
+      if (typeof result !== "object" || result === null || Array.isArray(result) || (!("undone" in result) && !("already_undone" in result))) throw new Error("Calendar returned an invalid undo result.");
+      setImportReceipt({ ...importReceipt, undone: true }); await refresh(); setMessage("The imported batch was undone without overwriting later edits.");
+    } catch (error) { setMessage(`Could not undo import. ${errorText(error)}`); }
+    finally { setBusy(false); }
+  };
   const selectRange = (selection: DateSelectArg) => beginDraft(freshDraft(calendarMarkerToInstant(selection.start, activeZone, selection.allDay).date, calendarMarkerToInstant(selection.end, activeZone, selection.allDay).date, selection.allDay, activeZone));
   const clickDate = (selection: DateClickArg) => { const endMarker = new Date(selection.date.getTime() + (selection.allDay ? 86_400_000 : 3_600_000)); beginDraft(freshDraft(calendarMarkerToInstant(selection.date, activeZone, selection.allDay).date, calendarMarkerToInstant(endMarker, activeZone, selection.allDay).date, selection.allDay, activeZone)); };
   const clickEvent = (event: EventClickArg) => { const item = event.event.extendedProps.item as OccurrenceView | undefined; if (item) void openEvent(item); };
@@ -227,6 +287,7 @@ export const App = () => {
   const businessHours = preferences ? [{ daysOfWeek: weekdayLabels.map((_, day) => day).filter((day) => (preferences.allowed_weekdays_mask & 2 ** day) !== 0), startTime: minutesToTime(preferences.day_start_minute), endTime: minutesToTime(preferences.day_end_minute) }] : undefined;
   const recurring = draft.recurrence.frequency !== "none";
   const rendezvousMeeting = draft.source === "rendezvous";
+  const importedSeries = draft.source === "import";
   const rendezvousHold = rendezvousMeeting && draft.status === "hold";
   const recurrencePreview = useMemo(() => materializeRecurrence(draft.start, draft.end, draft.allDay, draft.recurrence, activeZone), [activeZone, draft.start, draft.end, draft.allDay, draft.recurrence]);
   const slotDuration = minutesToDuration(preferences?.slot_increment_minutes ?? 15);
@@ -246,6 +307,7 @@ export const App = () => {
     <div className="calendar-layout nt-page-main"><section className="nt-panel calendar-board" aria-label="Calendar views"><FullCalendar plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]} initialView={initialCalendarView} timeZone="UTC" now={instantToCalendarMarker(new Date(), activeZone)} datesSet={showRange} headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek" }} buttonText={{ today: "Today", month: "Month", week: "Week", day: "Day", list: "Agenda" }} events={calendarEvents} selectable selectMirror select={selectRange} dateClick={clickDate} eventClick={clickEvent} eventDrop={dropEvent} eventResize={resizeEvent} editable={!busy} eventInteractive nowIndicator navLinks dayMaxEvents allDaySlot {...(businessHours ? { businessHours } : {})} scrollTime={preferences ? `${minutesToTime(preferences.day_start_minute)}:00` : "08:00:00"} slotDuration={slotDuration} snapDuration={slotDuration} height={calendarHeight} /></section>
       <aside className="calendar-sidebar"><section className="nt-panel editor" aria-labelledby="event-editor-title"><div className="section-title"><div><p className="nt-eyebrow">{draft.seriesId ? "Edit event" : "New event"}</p><h2 id="event-editor-title">{draft.seriesId ? draft.title || "Untitled event" : "Block or schedule time"}</h2></div>{draft.seriesId && <button className="nt-button nt-button--sm" onClick={() => setDraft(freshDraft(undefined, undefined, false, activeZone))} type="button">New</button>}</div>
         {rendezvousMeeting && <div className="meeting-notice" role="status"><strong>{rendezvousHold ? "Tentative Rendezvous hold" : "Scheduled through Rendezvous"}</strong><span>{rendezvousHold ? "This time is temporarily reserved while delivery or confirmation is unresolved. Open Rendezvous to review or retry it." : "This confirmed meeting is read-only here. Open Rendezvous to see the negotiation or manage its state."}</span></div>}
+        {importedSeries && <div className="meeting-notice" role="status"><strong>Imported iCalendar series</strong><span>You are editing only this occurrence. This preserves the other imported dates and makes a later file update surface as a conflict instead of overwriting your edit.</span></div>}
         {draft.seriesId && recurring && !rendezvousMeeting && <fieldset><legend>Change</legend><div className="scope-picker"><label><input type="radio" checked={draft.editScope === "occurrence"} onChange={() => setDraft({ ...draft, editScope: "occurrence" })} />This event</label><label><input type="radio" checked={draft.editScope === "series"} onChange={() => setDraft({ ...draft, editScope: "series", start: draft.anchorStart, end: draft.anchorEnd })} />Entire series</label></div></fieldset>}
         <label>Title<input ref={titleInputRef} required disabled={rendezvousMeeting} maxLength={160} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label><label className="inline-check"><input type="checkbox" checked={draft.allDay} disabled={rendezvousMeeting || (draft.editScope === "occurrence" && recurring)} onChange={(event) => changeAllDay(event.target.checked)} />All-day event</label>
         <div className="form-row"><label>Starts<input required disabled={rendezvousMeeting} type={draft.allDay ? "date" : "datetime-local"} value={draft.start} onChange={(event) => setDraft({ ...draft, start: event.target.value })} /></label><label>Ends{draft.allDay ? " (exclusive)" : ""}<input required disabled={rendezvousMeeting} type={draft.allDay ? "date" : "datetime-local"} value={draft.end} onChange={(event) => setDraft({ ...draft, end: event.target.value })} /></label></div>
@@ -266,6 +328,11 @@ export const App = () => {
         {searchState === "ready" && searchCursor !== null && <button className="nt-button nt-button--sm" disabled={busy} type="button" onClick={() => void runSearch(false)}>Search more</button>}
       </section>
       <section className="nt-panel editor export-editor"><div><p className="nt-eyebrow">Interoperability</p><h2>Export iCalendar</h2></div><label className="inline-check"><input type="checkbox" checked={exportDetails} onChange={(event) => setExportDetails(event.target.checked)} />Include titles, notes, and locations</label><label className="inline-check"><input type="checkbox" checked={exportHolds} onChange={(event) => setExportHolds(event.target.checked)} />Include live tentative Rendezvous holds</label><div className="editor-actions"><button className="nt-button nt-button--sm" disabled={busy} onClick={() => void exportCalendar({ start: visibleRangeRef.current.start, end: visibleRangeRef.current.end }, "neutron-calendar-visible-range")} type="button">Export visible range</button><button className="nt-button nt-button--sm" disabled={busy} onClick={() => void exportCalendar({}, "neutron-calendar")} type="button">Export calendar</button></div>{preparedExport && <div className="export-publication" role="status"><p><strong>{preparedExport.filename}</strong> · {preparedExport.bodyBytes.toLocaleString()} bytes</p>{preparedExport.path && <label>Saved privately in Files<input readOnly value={preparedExport.path} onFocus={(event) => event.currentTarget.select()} /></label>}<div className="editor-actions"><button className="nt-button nt-button--sm" onClick={copyPreparedExport} type="button">Copy iCalendar data</button><button className="nt-button nt-button--ghost nt-button--sm" onClick={openFiles} type="button">Open Files</button><button className="nt-button nt-button--ghost nt-button--sm" onClick={() => setPreparedExport(null)} type="button">Clear prepared export</button></div><p className="editor-hint">In Files, select the saved file and choose Download. If Files is unavailable, copy the data and save it as a plain-text file with the filename shown above.</p></div>}<p className="editor-hint">The `.ics` file works with Google Calendar, Outlook, Apple Calendar, and other iCalendar apps. Files is an optional private download handoff; Calendar itself remains independently installable and keeps no extra export memory. Turn details off to export only Busy labels and times. Expired holds and cancelled occurrences are excluded.</p></section>
+      <section className="nt-panel editor import-editor" aria-labelledby="calendar-import-title"><div><p className="nt-eyebrow">Review before changing</p><h2 id="calendar-import-title">Import iCalendar</h2></div><label>Choose `.ics` file<input accept=".ics,text/calendar" disabled={busy} type="file" onChange={(event) => void loadImportFile(event.currentTarget.files?.[0] ?? null)} /></label>
+        {!importPreview && !importReceipt && <p className="editor-hint">Parsing happens locally in a bounded worker. Calendar rejects scheduling messages, attendees, organizers, alarms, malformed recurrence, and files larger than 1 MiB. Selecting a file does not change your calendar.</p>}
+        {importPreview && <div className="import-preview" role="region" aria-label={`Import preview for ${importFilename}`}><div className="import-summary"><strong>{importFilename}</strong><span>{importSelected.size} backend mutation{importSelected.size === 1 ? "" : "s"} selected</span></div>{importPreview.diagnostics.length > 0 && <ul className="import-diagnostics" aria-label="Import diagnostics">{importPreview.diagnostics.map((item, index) => <li key={`${item.code}:${item.uid ?? "file"}:${index}`}><strong>{item.code.replaceAll("_", " ")}</strong>: {item.message}{item.uid ? ` (${item.uid})` : ""}</li>)}</ul>}<ol>{importPreview.items.map((item) => { const first = item.series.occurrences[0]; const selectable = item.category === "create" || item.category === "update"; return <li className={`import-item import-item--${item.category}`} key={item.uid}><label><input type="checkbox" disabled={!selectable || busy} checked={importSelected.has(item.uid)} onChange={() => toggleImport(item.uid)} /><span><strong>{first?.title ?? item.uid}</strong><small>{item.category} · {item.series.occurrences.length} occurrence{item.series.occurrences.length === 1 ? "" : "s"}</small></span></label>{first && <time dateTime={first.startIso}>{dateTime.format(new Date(first.startIso))} · {first.timeZone}</time>}<p>{item.reason}</p><details><summary>Details and UID</summary><p>{first?.location || "No location"}</p><p>{first?.notes || "No notes"}</p><code>{item.uid}</code></details></li>; })}</ol><div className="editor-actions"><button className="nt-button" disabled={busy || importSelected.size === 0} onClick={() => void commitImport()} type="button">Import {importSelected.size} selected</button><button className="nt-button nt-button--ghost nt-button--sm" disabled={busy} onClick={() => { setImportPreview(null); setImportSelected(new Set()); setImportFilename(""); }} type="button">Cancel preview</button></div><p className="editor-hint">Only create and newer-SEQUENCE updates can be selected. Unchanged, older, ambiguous, duplicate, and invalid series are never silently overwritten.</p></div>}
+        {importReceipt && <div className="export-publication" role="status"><p><strong>{importReceipt.undone ? "Import undone" : "Import committed"}</strong> · {importReceipt.changeCount} series · revision {importReceipt.committedRevision}</p><div className="editor-actions"><button className="nt-button nt-button--sm" disabled={busy || importReceipt.undone} onClick={() => void undoImport()} type="button">Undo this import</button><button className="nt-button nt-button--ghost nt-button--sm" disabled={busy} onClick={() => setImportReceipt(null)} type="button">Dismiss receipt</button></div><p className="editor-hint">Undo is safe: Calendar refuses if any affected series was edited after the import. Receipts are bounded to the 20 most recent batches.</p></div>}
+      </section>
       {preferences && <section className="nt-panel editor availability-editor">
         <div><p className="nt-eyebrow">Scheduling defaults</p><h2>Working hours</h2></div>
         <fieldset><legend>Days you usually meet</legend><div className="weekday-picker">{weekdayLabels.map((label, day) => <label key={label}><input type="checkbox" checked={(preferences.allowed_weekdays_mask & 2 ** day) !== 0} onChange={() => togglePreferenceDay(day)} />{label}</label>)}</div></fieldset>

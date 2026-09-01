@@ -1,5 +1,5 @@
 import Calendar "../backend/main";
-import Memory "../backend/memory/calendar/v3";
+import Memory "../backend/memory/calendar/v4";
 import TestEnvironment "TestEnvironment";
 
 let memory = Memory.init();

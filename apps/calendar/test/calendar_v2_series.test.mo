@@ -3,7 +3,7 @@ import Nat64 "mo:core/Nat64";
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Calendar "../backend/main";
-import Memory "../backend/memory/calendar/v3";
+import Memory "../backend/memory/calendar/v4";
 import SearchWire "SearchWire";
 import TestEnvironment "TestEnvironment";
 
@@ -69,8 +69,8 @@ let secondOccurrence = range.occurrences[1];
 let #ok(_) = calendar.calendar_occurrence_remove_v2({ occurrence_id = secondOccurrence.id; expected_occurrence_revision = secondOccurrence.revision }) else Runtime.trap("occurrence cancel failed");
 
 let renamedWrite = { write with title = "Renamed daily focus"; availability = #busy };
-let #ok(updated) = calendar.calendar_series_update_v2({ series_id = created.id; expected_series_revision = 1; value = renamedWrite }) else Runtime.trap("series update failed");
-assert (updated.revision == 2);
+let #ok(updated) = calendar.calendar_series_update_v2({ series_id = created.id; expected_series_revision = 3; value = renamedWrite }) else Runtime.trap("series update failed");
+assert (updated.revision == 4);
 let afterUpdate = calendar.calendar_range_v2({ start_ns = first; end_ns = third + duration; offset = 0; limit = 10 });
 assert (afterUpdate.total == 2);
 assert (afterUpdate.occurrences[0].id == firstOccurrence.id);
@@ -107,5 +107,5 @@ assert (exportPage.occurrences[0].occurrence.status == "overridden");
 assert (exportPage.occurrences[1].occurrence.status == "cancelled");
 let boundedExport = calendar.calendar_export_v1({ series_id = null; occurrence_id = null; start_ns = ?third; end_ns = ?(third + duration); include_holds = false; offset = 0; limit = 100 });
 assert (boundedExport.total == 1 and boundedExport.occurrences[0].occurrence.start_ns == third);
-let #ok(_) = calendar.calendar_series_remove_v2({ series_id = created.id; expected_series_revision = 2 }) else Runtime.trap("series remove failed");
+let #ok(_) = calendar.calendar_series_remove_v2({ series_id = created.id; expected_series_revision = 5 }) else Runtime.trap("series remove failed");
 assert (calendar.calendar_status().event_count == 0);

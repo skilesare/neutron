@@ -1,11 +1,12 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0 automated qualification and P1 Phase 5 memory migration complete; P1 ICS import is next; manual P0 interoperability/Agent acceptance remain release gates
+Status: P0 automated qualification and P1 Phase 6 ICS import/undo qualification complete; reminders, the subscription-feed decision, and manual interoperability/Agent acceptance remain release gates
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
 Unpublished P0 candidate: Calendar 0.3.0 (`version` `300`)
-Current Calendar memory: `calendar` schema v2
+Unpublished import candidate: Calendar 0.5.0 (`version` `500`), `calendar` schema v4
+Current production Calendar memory: `calendar` schema v2
 Current working Kernel baseline: 0.3.22
 Upstream synchronized for implementation: `infu/neutron` `ccf8595`
 Latest upstream Agent at planning time: 0.3.9, including opt-in OpenRouter web tools
@@ -48,7 +49,7 @@ separately. Do not combine release numbers or schema changes casually.
   must therefore use the existing Files app through an owner-approved frontend
   tool call. Never edit the released calendar v2 schema or migration lineage.
 
-### P1 — Calendar 0.4.0 target
+### P1 — successive Calendar 0.4.0+ candidates
 
 - Import `.ics` with parse diagnostics, preview, deduplication, bounded atomic
   commit, and no silent partial success.
@@ -56,7 +57,9 @@ separately. Do not combine release numbers or schema changes casually.
   Busy/Free, titles-and-times, and full-detail disclosure modes.
 - Add resident/tray reminders and an upcoming-event badge.
 - Add durable bounded bulk-operation receipts and safe undo.
-- Add memory schema v3 and an explicit v2-to-v3 migration.
+- Add memory schema v3 and an explicit v2-to-v3 migration for the P1 foundation.
+- Add schema v4 and an explicit v3-to-v4 migration when import undo needs
+  revision-aware receipt preimages. Never edit or relabel the locked v3 source.
 
 ### Explicit non-goals for P0/P1
 
@@ -133,10 +136,13 @@ calendar.
 
 ## 5. Delivery strategy
 
-Use two independently releasable increments:
+Use independently versioned increments:
 
 - Calendar 0.3.0: P0, memory remains v2.
-- Calendar 0.4.0: P1, memory advances to v3.
+- Calendar 0.4.0: P1 memory foundation, memory advances to v3.
+- Calendar 0.5.0: P1 import/undo, memory advances to v4.
+- Future reminder or companion-feed package-byte changes require another
+  strictly higher release version; never fold different bytes into 0.5.0.
 
 If both increments are implemented before any production publication, still
 retain two logical commits and test gates. Publication may ship only the higher
@@ -553,59 +559,82 @@ Phase 5 evidence (2026-09-01):
 
 ### 13.1 Input and parser
 
-- [ ] Accept a `.ics` browser file/Neutron attachment with an explicit media type
+- [x] Accept a `.ics` browser file/Neutron attachment with an explicit media type
   and a maximum size no greater than 1 MiB.
-- [ ] Parse locally in a killable/bounded worker if parsing untrusted input can
+- [x] Parse locally in a killable/bounded worker if parsing untrusted input can
   otherwise block the UI.
-- [ ] Enforce limits for bytes, lines, properties, components, recurrence
+- [x] Enforce limits for bytes, lines, properties, components, recurrence
   expansion, text, and resulting operations before backend mutation.
-- [ ] Support the exported P0 subset first: VEVENT, UTC/date values, TZID,
+- [x] Support the exported P0 subset first: VEVENT, UTC/date values, TZID,
   RRULE/RDATE, EXDATE, RECURRENCE-ID, UID, SEQUENCE, SUMMARY, DESCRIPTION,
   LOCATION, STATUS, and TRANSP.
-- [ ] Reject or explicitly report unsupported scheduling semantics. Never silently
+- [x] Reject or explicitly report unsupported scheduling semantics. Never silently
   reinterpret attendees, organizers, alarms, or arbitrary extensions.
-- [ ] Prevent formula/HTML/script interpretation; all values are plain text.
+- [x] Prevent formula/HTML/script interpretation; all values are plain text.
 
 ### 13.2 Preview and deduplication
 
-- [ ] Produce a deterministic preview categorized as create, update, unchanged,
+- [x] Produce a deterministic preview categorized as create, update, unchanged,
   conflict, duplicate, skipped, and invalid.
-- [ ] Match imported events by source namespace plus UID, never title alone.
-- [ ] Use SEQUENCE and content digest to avoid overwriting a newer local/imported
+- [x] Match imported events by source namespace plus UID, never title alone.
+- [x] Use SEQUENCE and content digest to avoid overwriting a newer local/imported
   revision without explicit conflict resolution.
-- [ ] Show date/time, timezone resolution, recurrence count, details disclosure,
+- [x] Show date/time, timezone resolution, recurrence count, details disclosure,
   and the exact number of backend mutations.
-- [ ] Let the owner select/deselect individual proposed items.
-- [ ] Agent gets compact preview summaries, not the complete private calendar.
+- [x] Let the owner select/deselect individual proposed items.
+- [x] Agent gets compact preview summaries, not the complete private calendar.
 
 ### 13.3 Atomic commit and undo
 
-- [ ] Add one bounded `calendar_import_commit_v1`/bulk backend mutation using the
+- [x] Add one bounded `calendar_import_commit_v1`/bulk backend mutation using the
   current calendar revision and a deterministic preview digest.
-- [ ] Limit one batch to a reviewed safe count, initially at most 250 event-series
+- [x] Limit one batch to a reviewed safe count, initially at most 250 event-series
   operations and at most 2,000 resulting occurrences.
-- [ ] Validate the complete batch before changing memory. Any invalid or stale
+- [x] Validate the complete batch before changing memory. Any invalid or stale
   item rejects the whole batch.
-- [ ] Persist a bounded receipt containing enough preimage to undo that exact
+- [x] Persist a bounded receipt containing enough preimage to undo that exact
   batch, but no raw source file or redundant unbounded content.
-- [ ] Add `calendar_bulk_status_v1` so an ambiguous caller can reconcile by batch
+- [x] Add `calendar_bulk_status_v1` so an ambiguous caller can reconcile by batch
   ID/digest without retrying blindly.
-- [ ] Add `calendar_bulk_undo_v1`; require the current affected revisions to match
+- [x] Add `calendar_bulk_undo_v1`; require the current affected revisions to match
   the receipt. If later edits conflict, refuse undo and explain which items block
   it. Never overwrite later owner changes.
-- [ ] Bound receipt count and bytes. Define deterministic oldest-receipt eviction.
-- [ ] Add owner UI and semantic Agent tools for preview, commit, status, and undo.
+- [x] Bound receipt count and bytes. Define deterministic oldest-receipt eviction.
+- [x] Add owner UI and semantic Agent tools for preview, commit, status, and undo.
 
 ### 13.4 Tests
 
-- [ ] Fuzz parser boundaries and malformed line folding/encoding.
-- [ ] Test duplicates, stale sequences, conflicting local edits, cancellations,
+- [x] Fuzz parser boundaries and malformed line folding/encoding.
+- [x] Test duplicates, stale sequences, conflicting local edits, cancellations,
   DST, all-day exclusivity, recurrence expansion limits, atomic rejection,
   unknown-outcome reconciliation, undo success, and undo conflict.
-- [ ] Round-trip P0 export -> P1 import -> export with semantic equivalence.
+- [x] Round-trip P0 export -> P1 import -> export with semantic equivalence.
 
 Exit gate: import never partially mutates state and every accepted bulk commit is
 reconcilable and conditionally undoable.
+
+Phase 6 evidence (2026-09-01):
+
+- Calendar 0.5.0 packages at 477,893 bytes with archive SHA-256
+  `88507a3870aaf7d1cbdd486f4f333fe0896fd8374338de0802ffd30d8afc52d8`.
+  The complete Calendar command passed
+  60 Bun tests plus memory, validation, availability, recurrence, search,
+  import, and migration Motoko programs.
+- Locked v3 remains
+  `837ec1952dd080b3fc418c2bbd332bb0d79f16345b2f02a97c60622f9530c916`.
+  Schema v4 is
+  `0551792bd3569af90f86832b883bb379841ffee86cdb6aa2c57ab14677f3b66f`;
+  migration 3-to-4 is
+  `920591286652dbaffcc523c353d477aaf11e5aaa210b02795b3c87ed727354a7`.
+- A live Kernel/Playwright flow passed file selection, preview, binary-sidecar
+  self calls, atomic commit, authoritative search, receipt display, safe undo,
+  and absence after undo in 7.9 seconds.
+- The exact production Calendar 0.2.0 fixture upgraded in-product to 0.5.0/v4
+  in 40.8 seconds with installation identity and representative owner state
+  preserved. Reinstall was used only to initialize the disposable old fixture.
+- The two-Neutron Calendar/Rendezvous fixture passed in 38.2 seconds using the
+  canonical Calendar-branch archive. Confirmed meetings and an interrupted live
+  hold survived 0.2.0-to-0.5.0 on Alice and Bob with handoff actions intact.
 
 ## 14. Phase 7 — P1 resident reminders and tray
 
@@ -714,18 +743,19 @@ serve this feed itself.
 Exit gate: feed is default-off, revocable, certified, privacy-reviewed, and
 accepted by both target consumers—or P1 ships without the feed.
 
-## 16. P1 release gate — Calendar 0.4.0
+## 16. P1 final release gate — version strictly above Calendar 0.5.0
 
 - [ ] Complete a security/privacy review for ICS import, Agent tools, undo,
   reminder lifecycle, and the bearer subscription URL.
-- [ ] Increase Calendar release version strictly above 0.3.0; target `400`.
-- [ ] Run clean initialization and exact v2-to-v3 production migration tests with
+- [ ] Increase the final Calendar release version strictly above the current
+  0.5.0 import candidate after any reminder/feed package bytes are added.
+- [x] Run clean initialization and exact v2-to-v3-to-v4 production migration tests with
   representative and maximum-bound data.
 - [ ] Run complete Calendar package, frontend, backend, domain, recurrence,
   migration, parser, Agent-tool, tray, certified-asset, Playwright, and upgrade
   suites.
-- [ ] Verify package size and all third-party licenses.
-- [ ] Install the final package through a state-preserving in-product upgrade;
+- [x] Verify the 0.5.0 import candidate package size and all third-party licenses.
+- [x] Install the 0.5.0 import candidate through a state-preserving in-product upgrade;
   never use reinstall as the production upgrade mechanism.
 - [ ] Review exact archive/source bytes and SHA-256.
 - [ ] STOP before production publication until the owner explicitly authorizes
@@ -739,7 +769,7 @@ Every phase must preserve:
 
 - clean install;
 - state-preserving upgrade from Calendar 0.2.0;
-- v1-to-v2 historical migration and v2-to-v3 migration where applicable;
+- v1-to-v2 historical migration plus v2-to-v3 and v3-to-v4 migrations where applicable;
 - one-time, recurring, overridden, cancelled, all-day, Busy, Free, hold, and
   confirmed Rendezvous events;
 - DST gap/fold behavior and non-hour offsets;
@@ -771,8 +801,8 @@ P0 is done only when Calendar 0.3.0 is independently releasable, all tests pass,
 memory v2 is restored unchanged, `.ics` export imports correctly, timezone
 behavior is truthful, authoritative search works, and Agent uses semantic tools.
 
-P1 is done only when Calendar 0.4.0 is independently releasable, v2 data migrates
-to v3 without loss, ICS imports are previewed/atomic/reconcilable, undo is safe,
+P1 is done only when its final version is independently releasable, v2 data migrates
+through v3 to v4 without loss, ICS imports are previewed/atomic/reconcilable, undo is safe,
 tray reminders are lifecycle-correct, and the subscription feed either passes
 real Google/Outlook compatibility or is explicitly withheld behind the MIME
 decision gate.

@@ -10,11 +10,12 @@ import Nat64 "mo:core/Nat64";
 import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Availability "AvailabilityV2";
-import Memory "memory/calendar/v3";
+import Memory "memory/calendar/v4";
 import Validation "Validation";
 
 module {
     let MAX_SERIES = 2_000; let MAX_OCCURRENCES = 10_000; let MAX_SERIES_OCCURRENCES = 730; let MAX_RANGE_RESULTS = 2_000; let MAX_SEARCH_SCAN = 2_000;
+    let MAX_IMPORT_SERIES = 250; let MAX_IMPORT_OCCURRENCES = 2_000; let MAX_BULK_RECEIPTS = 20; let MAX_BULK_RECEIPT_BYTES = 2_000_000;
     public type Status = { revision : Nat64; event_count : Nat };
     public type Error = { code : Text; message : Text; revision : Nat64 };
     public type EventView = { id : Nat64; revision : Nat64; start_ns : Nat64; end_ns : Nat64; title : Text; notes : Text; source : Text; status : Text; hold_expires_at_ns : ?Nat64 };
@@ -43,7 +44,7 @@ module {
     public type OccurrenceUpdateRequest = { occurrence_id : Nat64; expected_occurrence_revision : Nat64; start_ns : Nat64; end_ns : Nat64; title_override : ?Text; notes_override : ?Text; location_override : ?Text };
     public type OccurrenceRemoveRequest = { occurrence_id : Nat64; expected_occurrence_revision : Nat64 };
     public type RangeRequest = { start_ns : Nat64; end_ns : Nat64; offset : Nat; limit : Nat };
-    public type SeriesView = { id : Nat64; revision : Nat64; title : Text; notes : Text; location : Text; color : Text; availability : AvailabilityMode; kind : EventKind; source : Text; time_zone : Text; recurrence : ?RecurrenceRule; created_at_ns : Nat64; updated_at_ns : Nat64 };
+    public type SeriesView = { id : Nat64; revision : Nat64; title : Text; notes : Text; location : Text; color : Text; availability : AvailabilityMode; kind : EventKind; source : Text; imported : Bool; time_zone : Text; recurrence : ?RecurrenceRule; created_at_ns : Nat64; updated_at_ns : Nat64 };
     public type OccurrenceView = { id : Nat64; revision : Nat64; series_id : Nat64; series_revision : Nat64; recurrence_key : Text; start_ns : Nat64; end_ns : Nat64; title : Text; notes : Text; location : Text; color : Text; availability : AvailabilityMode; kind : EventKind; source : Text; status : Text; time_zone : Text };
     public type RangePage = { revision : Nat64; total : Nat; occurrences : [OccurrenceView] };
     public type SeriesOccurrencesRequest = { series_id : Nat64; offset : Nat; limit : Nat };
@@ -56,6 +57,19 @@ module {
     public type SearchResultV1 = { #ok : SearchPageV1; #stale : { revision : Nat64 }; #invalid : { message : Text; revision : Nat64 } };
     public type SeriesResult = { #ok : SeriesView; #err : Error };
     public type OccurrenceResult = { #ok : OccurrenceView; #err : Error };
+
+    public type ImportIndexRequestV1 = { source_namespace : Text; external_uids : [Text] };
+    public type ImportIndexEntryV1 = { external_uid : Text; series_id : Nat64; series_revision : Nat64; sequence : Nat64; content_digest : Blob };
+    public type ImportIndexV1 = { revision : Nat64; entries : [ImportIndexEntryV1] };
+    public type ImportOccurrenceInputV1 = { recurrence_key : Text; start_ns : Nat64; end_ns : Nat64; status : { #normal; #cancelled }; title : Text; notes : Text; location : Text };
+    public type ImportSeriesInputV1 = { external_uid : Text; sequence : Nat64; content_digest : Blob; existing_series_id : ?Nat64; expected_series_revision : ?Nat64; availability : AvailabilityMode; kind : EventKind; time_zone : Text; occurrences : [ImportOccurrenceInputV1] };
+    public type ImportCommitRequestV1 = { expected_revision : Nat64; batch_id : Blob; preview_digest : Blob; source_namespace : Text; series : [ImportSeriesInputV1] };
+    public type BulkReceiptViewV1 = { batch_id : Blob; preview_digest : Blob; committed_revision : Nat64; created_at_ns : Nat64; change_count : Nat; undone_at_revision : ?Nat64 };
+    public type ImportCommitResultV1 = { #committed : BulkReceiptViewV1; #already_committed : BulkReceiptViewV1; #err : Error };
+    public type BulkStatusRequestV1 = { batch_id : Blob; preview_digest : Blob };
+    public type BulkStatusResultV1 = { #committed : BulkReceiptViewV1; #not_found : { revision : Nat64 }; #digest_mismatch : { revision : Nat64 } };
+    public type BulkUndoRequestV1 = { batch_id : Blob; preview_digest : Blob };
+    public type BulkUndoResultV1 = { #undone : { revision : Nat64 }; #already_undone : { revision : Nat64 }; #err : Error };
 
     public type AvailabilityRequestV1 = { window_start_ns : Nat64; window_end_ns : Nat64; duration_minutes : Nat32; candidate_starts_ns : [Nat64] };
     public type AvailabilityResultV1 = { revision : Nat64; available_starts_ns : [Nat64] };
@@ -134,6 +148,147 @@ module {
             #ok({ revision = mem.revision; scanned = index - start; occurrences = values; next_offset = if (index < mem.occurrences.size()) ?index else null })
         };
 
+        public func /*query*/calendar_import_index_v1(request : ImportIndexRequestV1) : ImportIndexV1 {
+            if (not validImportNamespace(request.source_namespace) or request.external_uids.size() > MAX_IMPORT_SERIES) return { revision = mem.revision; entries = [] };
+            var entries : [ImportIndexEntryV1] = [];
+            for (uid in request.external_uids.vals()) {
+                if (validImportUid(uid)) {
+                    switch (findImportProvenance(request.source_namespace, uid)) {
+                        case (?(_, provenance)) {
+                            switch (findSeries(provenance.series_id)) {
+                                case (?(_, series)) entries := Array.concat(entries, [{ external_uid = uid; series_id = series.id; series_revision = series.revision; sequence = provenance.sequence; content_digest = provenance.content_digest }]);
+                                case null {};
+                            }
+                        };
+                        case null {};
+                    }
+                }
+            };
+            { revision = mem.revision; entries }
+        };
+
+        public func /*update*/calendar_import_commit_v1(request : ImportCommitRequestV1) : ImportCommitResultV1 {
+            switch (findBulkReceipt(request.batch_id)) {
+                case (?(_, receipt)) {
+                    if (receipt.preview_digest == request.preview_digest) return #already_committed(receiptView(receipt));
+                    return #err(error("batch_conflict", "Batch ID was already used for a different preview", mem.revision));
+                };
+                case null {};
+            };
+            if (request.expected_revision != mem.revision) return #err(error("stale", "Calendar changed; refresh the import preview", mem.revision));
+            switch (validateImportRequest(request)) { case (?problem) return #err(problem); case null {} };
+
+            var nextSeriesId = mem.next_series_id;
+            var nextOccurrenceId = mem.next_occurrence_id;
+            var nextSeries = mem.series;
+            var nextOccurrences = mem.occurrences;
+            var nextProvenance = mem.import_provenance;
+            var changes : [Memory.BulkUndoChange] = [];
+            let now = nowNs();
+            for (input in request.series.vals()) {
+                let first = input.occurrences[0];
+                switch (input.existing_series_id) {
+                    case null {
+                        let id = nextSeriesId; nextSeriesId += 1;
+                        let created : Memory.EventSeries = {
+                            id; revision = 1; title = first.title; notes = first.notes; location = first.location; color = "sage";
+                            availability = input.availability; kind = input.kind; source = #owner; time_zone = input.time_zone;
+                            recurrence = null; created_at_ns = now; updated_at_ns = now;
+                        };
+                        let built = importOccurrences(id, input.occurrences, [], nextOccurrenceId);
+                        nextOccurrenceId := built.next_id;
+                        nextSeries := Array.concat(nextSeries, [created]);
+                        nextOccurrences := Array.concat(nextOccurrences, built.values);
+                        nextProvenance := Array.concat(nextProvenance, [{ series_id = id; source_namespace = request.source_namespace; external_uid = input.external_uid; sequence = input.sequence; content_digest = input.content_digest }]);
+                        let change : Memory.BulkUndoChange = #created({ series_id = id; expected_series_revision = 1 : Nat64 });
+                        changes := Array.concat(changes, [change]);
+                    };
+                    case (?id) {
+                        let ?(seriesIndex, current) = findSeriesIn(nextSeries, id) else return #err(error("stale", "An imported series no longer exists", mem.revision));
+                        let priorOccurrences = Array.filter<Memory.Occurrence>(nextOccurrences, func(item) { item.series_id == id });
+                        let priorProvenance = switch (findImportProvenanceIn(nextProvenance, request.source_namespace, input.external_uid)) { case (?(_, value)) ?value; case null null };
+                        let priorReminders = Array.filter<Memory.Reminder>(mem.reminders, func(item) { item.series_id == id });
+                        let before : Memory.SeriesSnapshot = { series = current; occurrences = priorOccurrences; provenance = priorProvenance; reminders = priorReminders };
+                        let updated : Memory.EventSeries = {
+                            current with revision = current.revision + 1; title = first.title; notes = first.notes; location = first.location;
+                            availability = input.availability; kind = input.kind; time_zone = input.time_zone; recurrence = null; updated_at_ns = now;
+                        };
+                        let built = importOccurrences(id, input.occurrences, priorOccurrences, nextOccurrenceId);
+                        nextOccurrenceId := built.next_id;
+                        nextSeries := replaceAt(nextSeries, seriesIndex, updated);
+                        nextOccurrences := Array.concat(Array.filter<Memory.Occurrence>(nextOccurrences, func(item) { item.series_id != id }), built.values);
+                        let ?(provenanceIndex, _) = findImportProvenanceIn(nextProvenance, request.source_namespace, input.external_uid) else return #err(error("stale", "Import provenance changed", mem.revision));
+                        nextProvenance := replaceAt(nextProvenance, provenanceIndex, { series_id = id; source_namespace = request.source_namespace; external_uid = input.external_uid; sequence = input.sequence; content_digest = input.content_digest });
+                        changes := Array.concat(changes, [#replaced({ before; expected_series_revision = updated.revision })]);
+                    };
+                }
+            };
+            if (bulkChangesBytes(changes) > MAX_BULK_RECEIPT_BYTES) return #err(error("receipt_too_large", "Import undo preimage exceeds the 2,000,000 byte receipt limit", mem.revision));
+            let committedRevision = mem.revision + 1;
+            let receipt : Memory.BulkReceipt = { batch_id = request.batch_id; preview_digest = request.preview_digest; committed_revision = committedRevision; created_at_ns = now; changes; undone_at_revision = null };
+            mem.next_series_id := nextSeriesId;
+            mem.next_occurrence_id := nextOccurrenceId;
+            mem.series := nextSeries;
+            mem.occurrences := nextOccurrences;
+            mem.import_provenance := nextProvenance;
+            mem.revision := committedRevision;
+            mem.bulk_receipts := appendBoundedReceipt(mem.bulk_receipts, receipt);
+            #committed(receiptView(receipt))
+        };
+
+        public func /*query*/calendar_bulk_status_v1(request : BulkStatusRequestV1) : BulkStatusResultV1 {
+            switch (findBulkReceipt(request.batch_id)) {
+                case null #not_found({ revision = mem.revision });
+                case (?(_, receipt)) {
+                    if (receipt.preview_digest == request.preview_digest) #committed(receiptView(receipt))
+                    else #digest_mismatch({ revision = mem.revision })
+                };
+            }
+        };
+
+        public func /*update*/calendar_bulk_undo_v1(request : BulkUndoRequestV1) : BulkUndoResultV1 {
+            let ?(receiptIndex, receipt) = findBulkReceipt(request.batch_id) else return #err(error("not_found", "Import receipt not found or expired", mem.revision));
+            if (receipt.preview_digest != request.preview_digest) return #err(error("digest_mismatch", "Receipt does not match this preview", mem.revision));
+            switch (receipt.undone_at_revision) { case (?revision) return #already_undone({ revision }); case null {} };
+            var conflicts : [Text] = [];
+            for (change in receipt.changes.vals()) {
+                switch (change) {
+                    case (#created(value)) switch (findSeries(value.series_id)) { case (?(_, series)) if (series.revision != value.expected_series_revision) conflicts := Array.concat(conflicts, [Nat64.toText(value.series_id)]); case null conflicts := Array.concat(conflicts, [Nat64.toText(value.series_id)]); case (_) {} };
+                    case (#replaced(value)) switch (findSeries(value.before.series.id)) { case (?(_, series)) if (series.revision != value.expected_series_revision) conflicts := Array.concat(conflicts, [Nat64.toText(value.before.series.id)]); case null conflicts := Array.concat(conflicts, [Nat64.toText(value.before.series.id)]); case (_) {} };
+                    case (#deleted(value)) switch (findSeries(value.series.id)) { case (?_) conflicts := Array.concat(conflicts, [Nat64.toText(value.series.id)]); case null {} };
+                }
+            };
+            if (conflicts.size() > 0) return #err(error("undo_conflict", "Later edits block undo for series " # joinTexts(conflicts, ", "), mem.revision));
+            var nextSeries = mem.series; var nextOccurrences = mem.occurrences; var nextProvenance = mem.import_provenance; var nextReminders = mem.reminders;
+            for (change in receipt.changes.vals()) {
+                switch (change) {
+                    case (#created(value)) {
+                        nextSeries := Array.filter<Memory.EventSeries>(nextSeries, func(item) { item.id != value.series_id });
+                        nextOccurrences := Array.filter<Memory.Occurrence>(nextOccurrences, func(item) { item.series_id != value.series_id });
+                        nextProvenance := Array.filter<Memory.ImportProvenance>(nextProvenance, func(item) { item.series_id != value.series_id });
+                        nextReminders := Array.filter<Memory.Reminder>(nextReminders, func(item) { item.series_id != value.series_id });
+                    };
+                    case (#replaced(value)) {
+                        let id = value.before.series.id;
+                        switch (findSeriesIn(nextSeries, id)) { case (?(index, _)) nextSeries := replaceAt(nextSeries, index, value.before.series); case null nextSeries := Array.concat(nextSeries, [value.before.series]) };
+                        nextOccurrences := Array.concat(Array.filter<Memory.Occurrence>(nextOccurrences, func(item) { item.series_id != id }), value.before.occurrences);
+                        nextProvenance := Array.filter<Memory.ImportProvenance>(nextProvenance, func(item) { item.series_id != id });
+                        switch (value.before.provenance) { case (?prior) nextProvenance := Array.concat(nextProvenance, [prior]); case null {} };
+                        nextReminders := Array.concat(Array.filter<Memory.Reminder>(nextReminders, func(item) { item.series_id != id }), value.before.reminders);
+                    };
+                    case (#deleted(value)) {
+                        nextSeries := Array.concat(nextSeries, [value.series]); nextOccurrences := Array.concat(nextOccurrences, value.occurrences);
+                        switch (value.provenance) { case (?prior) nextProvenance := Array.concat(nextProvenance, [prior]); case null {} };
+                        nextReminders := Array.concat(nextReminders, value.reminders);
+                    };
+                }
+            };
+            let revision = mem.revision + 1;
+            mem.series := nextSeries; mem.occurrences := nextOccurrences; mem.import_provenance := nextProvenance; mem.reminders := nextReminders; mem.revision := revision;
+            mem.bulk_receipts := replaceAt(mem.bulk_receipts, receiptIndex, { receipt with undone_at_revision = ?revision });
+            #undone({ revision })
+        };
+
         public func /*update*/calendar_series_create_v2(request : SeriesCreateRequest) : SeriesResult {
             if (request.expected_revision != mem.revision) return #err(error("stale", "Calendar changed", mem.revision));
             switch (validateSeriesWrite(request.value, 0)) { case (?problem) return #err(problem); case null {} };
@@ -159,7 +314,7 @@ module {
             let ?(index, current) = findSeries(request.series_id) else return #err(error("not_found", "Series not found", mem.revision));
             if (current.revision != request.expected_series_revision) return #err(error("stale", "Series changed", mem.revision));
             if (current.source != #owner) return #err(error("forbidden", "Rendezvous series cannot be deleted here", mem.revision));
-            mem.series := removeAt(mem.series, index); mem.occurrences := Array.filter<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id != current.id }); mem.revision += 1; #ok({ revision = mem.revision })
+            mem.series := removeAt(mem.series, index); mem.occurrences := Array.filter<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id != current.id }); mem.import_provenance := Array.filter<Memory.ImportProvenance>(mem.import_provenance, func(item) { item.series_id != current.id }); mem.reminders := Array.filter<Memory.Reminder>(mem.reminders, func(item) { item.series_id != current.id }); mem.revision += 1; #ok({ revision = mem.revision })
         };
         public func /*update*/calendar_occurrence_update_v2(request : OccurrenceUpdateRequest) : OccurrenceResult {
             let ?(index, current) = findOccurrence(request.occurrence_id) else return #err(error("not_found", "Occurrence not found", mem.revision));
@@ -178,6 +333,8 @@ module {
                 notes_override = keepOverride(request.notes_override, current.notes_override);
                 location_override = keepOverride(request.location_override, current.location_override);
             };
+            let ?(seriesIndex, series) = findSeries(current.series_id) else return #err(error("corrupt", "Series missing", mem.revision));
+            mem.series := replaceAt(mem.series, seriesIndex, { series with revision = series.revision + 1; updated_at_ns = nowNs() });
             mem.occurrences := replaceAt(mem.occurrences, index, updated); mem.revision += 1; #ok(occurrenceView(updated))
         };
         public func /*update*/calendar_occurrence_remove_v2(request : OccurrenceRemoveRequest) : MutationResult {
@@ -185,6 +342,8 @@ module {
             if (current.revision != request.expected_occurrence_revision) return #err(error("stale", "Occurrence changed", mem.revision));
             let ?(_, owner) = findSeries(current.series_id) else return #err(error("corrupt", "Series missing", mem.revision));
             if (owner.source != #owner) return #err(error("forbidden", "Rendezvous occurrence cannot be deleted here", mem.revision));
+            let ?(seriesIndex, series) = findSeries(current.series_id) else return #err(error("corrupt", "Series missing", mem.revision));
+            mem.series := replaceAt(mem.series, seriesIndex, { series with revision = series.revision + 1; updated_at_ns = nowNs() });
             mem.occurrences := replaceAt(mem.occurrences, index, { current with revision = current.revision + 1; status = #cancelled }); mem.revision += 1; #ok({ revision = mem.revision })
         };
 
@@ -211,7 +370,7 @@ module {
             let ?(index, current) = findOccurrence(request.id) else return #err(error("not_found", "Event not found", mem.revision));
             if (current.revision != request.expected_event_revision) return #err(error("stale", "Event changed", mem.revision));
             mem.occurrences := removeAt(mem.occurrences, index);
-            if (not Array.any<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id == current.series_id })) mem.series := Array.filter<Memory.EventSeries>(mem.series, func(item) { item.id != current.series_id });
+            if (not Array.any<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id == current.series_id })) { mem.series := Array.filter<Memory.EventSeries>(mem.series, func(item) { item.id != current.series_id }); mem.import_provenance := Array.filter<Memory.ImportProvenance>(mem.import_provenance, func(item) { item.series_id != current.series_id }); mem.reminders := Array.filter<Memory.Reminder>(mem.reminders, func(item) { item.series_id != current.series_id }) };
             mem.revision += 1; #ok({ revision = mem.revision })
         };
 
@@ -248,6 +407,76 @@ module {
             if (not validExternalId(request.external_id)) return #invalid;
             let ?(seriesIndex, _, seriesOccurrence) = findExternal(request.external_id) else return #not_found({ calendar_revision = mem.revision });
             mem.series := removeAt(mem.series, seriesIndex); mem.occurrences := Array.filter<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id != seriesOccurrence.series_id }); mem.revision += 1; #ok({ calendar_revision = mem.revision })
+        };
+
+        func validateImportRequest(request : ImportCommitRequestV1) : ?Error {
+            if (not validImportNamespace(request.source_namespace) or Blob.size(request.batch_id) < 16 or Blob.size(request.batch_id) > 32 or Blob.size(request.preview_digest) != 32) return ?error("invalid", "Invalid import identity or digest", mem.revision);
+            if (request.series.size() == 0 or request.series.size() > MAX_IMPORT_SERIES) return ?error("invalid", "Import must contain 1 to 250 selected series", mem.revision);
+            var occurrenceCount = 0;
+            var seenUids : [Text] = [];
+            var createdCount = 0;
+            var replacedOccurrences = 0;
+            for (input in request.series.vals()) {
+                if (not validImportUid(input.external_uid) or Blob.size(input.content_digest) != 32 or Array.any<Text>(seenUids, func(value) { value == input.external_uid })) return ?error("invalid", "Import contains an invalid or duplicate UID", mem.revision);
+                seenUids := Array.concat(seenUids, [input.external_uid]);
+                occurrenceCount += input.occurrences.size();
+                if (input.occurrences.size() == 0 or input.occurrences.size() > MAX_SERIES_OCCURRENCES or occurrenceCount > MAX_IMPORT_OCCURRENCES) return ?error("invalid", "Import occurrence limit exceeded", mem.revision);
+                if (not Validation.validTimeZone(input.time_zone)) return ?error("invalid", "Import contains an invalid time zone", mem.revision);
+                var previousStart : ?Nat64 = null; var previousKey = "";
+                for (occurrence in input.occurrences.vals()) {
+                    if (not validOccurrence(occurrence.start_ns, occurrence.end_ns, occurrence.recurrence_key) or occurrence.title.size() == 0 or not Validation.textWithin(occurrence.title, Validation.MAX_TITLE_BYTES) or not Validation.textWithin(occurrence.notes, Validation.MAX_NOTES_BYTES) or not Validation.textWithin(occurrence.location, 512)) return ?error("invalid", "Import contains invalid event fields", mem.revision);
+                    switch (previousStart) { case (?start) if (occurrence.start_ns <= start or Text.compare(occurrence.recurrence_key, previousKey) == #equal) return ?error("invalid", "Imported occurrences must be ordered and unique", mem.revision); case (_) {} };
+                    previousStart := ?occurrence.start_ns; previousKey := occurrence.recurrence_key;
+                };
+                switch (input.existing_series_id, input.expected_series_revision, findImportProvenance(request.source_namespace, input.external_uid)) {
+                    case (null, null, null) createdCount += 1;
+                    case (?id, ?expected, ?(_, provenance)) {
+                        if (provenance.series_id != id) return ?error("stale", "Import match changed; refresh the preview", mem.revision);
+                        let ?(_, current) = findSeries(id) else return ?error("stale", "Imported series was deleted", mem.revision);
+                        if (current.revision != expected) return ?error("stale", "Imported series was edited; refresh the preview", mem.revision);
+                        if (input.sequence <= provenance.sequence) return ?error("conflict", "Import is unchanged, ambiguous, or older than stored data", mem.revision);
+                        replacedOccurrences += Array.filter<Memory.Occurrence>(mem.occurrences, func(item) { item.series_id == id }).size();
+                    };
+                    case (_) return ?error("conflict", "Import selection does not match current provenance", mem.revision);
+                }
+            };
+            if (mem.series.size() + createdCount > MAX_SERIES or mem.occurrences.size() - replacedOccurrences + occurrenceCount > MAX_OCCURRENCES) return ?error("full", "Calendar capacity reached", mem.revision);
+            null
+        };
+
+        func importOccurrences(seriesId : Nat64, inputs : [ImportOccurrenceInputV1], existing : [Memory.Occurrence], initialNextId : Nat64) : { values : [Memory.Occurrence]; next_id : Nat64 } {
+            var nextId = initialNextId;
+            let first = inputs[0];
+            let values = Array.map<ImportOccurrenceInputV1, Memory.Occurrence>(inputs, func(input) {
+                let prior = Array.find<Memory.Occurrence>(existing, func(item) { item.recurrence_key == input.recurrence_key });
+                let id : Nat64 = switch (prior) { case (?value) value.id; case null { let value = nextId; nextId += 1; value } };
+                let revision : Nat64 = switch (prior) { case (?value) value.revision + 1; case null (1 : Nat64) };
+                {
+                    id; revision; series_id = seriesId; recurrence_key = input.recurrence_key; start_ns = input.start_ns; end_ns = input.end_ns;
+                    status = switch (input.status) { case (#normal) #normal; case (#cancelled) #cancelled };
+                    title_override = if (input.title == first.title) null else ?input.title;
+                    notes_override = if (input.notes == first.notes) null else ?input.notes;
+                    location_override = if (input.location == first.location) null else ?input.location;
+                }
+            });
+            { values; next_id = nextId }
+        };
+
+        func findImportProvenance(namespace : Text, uid : Text) : ?(Nat, Memory.ImportProvenance) { findImportProvenanceIn(mem.import_provenance, namespace, uid) };
+        func findBulkReceipt(batchId : Blob) : ?(Nat, Memory.BulkReceipt) { var index = 0; while (index < mem.bulk_receipts.size()) { if (mem.bulk_receipts[index].batch_id == batchId) return ?(index, mem.bulk_receipts[index]); index += 1 }; null };
+        func receiptView(receipt : Memory.BulkReceipt) : BulkReceiptViewV1 { { batch_id = receipt.batch_id; preview_digest = receipt.preview_digest; committed_revision = receipt.committed_revision; created_at_ns = receipt.created_at_ns; change_count = receipt.changes.size(); undone_at_revision = receipt.undone_at_revision } };
+        func appendBoundedReceipt(receipts : [Memory.BulkReceipt], receipt : Memory.BulkReceipt) : [Memory.BulkReceipt] { let combined = Array.concat(receipts, [receipt]); if (combined.size() <= MAX_BULK_RECEIPTS) combined else Array.tabulate<Memory.BulkReceipt>(MAX_BULK_RECEIPTS, func(index) { combined[combined.size() - MAX_BULK_RECEIPTS + index] }) };
+        func bulkChangesBytes(changes : [Memory.BulkUndoChange]) : Nat {
+            var total = 0;
+            func textBytes(value : Text) : Nat { Blob.size(Text.encodeUtf8(value)) };
+            func snapshotBytes(value : Memory.SeriesSnapshot) : Nat {
+                var size = 256 + textBytes(value.series.title) + textBytes(value.series.notes) + textBytes(value.series.location) + textBytes(value.series.color) + textBytes(value.series.time_zone);
+                for (item in value.occurrences.vals()) { size += 160 + textBytes(item.recurrence_key); switch (item.title_override) { case (?text) size += textBytes(text); case null {} }; switch (item.notes_override) { case (?text) size += textBytes(text); case null {} }; switch (item.location_override) { case (?text) size += textBytes(text); case null {} } };
+                switch (value.provenance) { case (?item) size += 64 + textBytes(item.source_namespace) + textBytes(item.external_uid) + Blob.size(item.content_digest); case null {} };
+                size + value.reminders.size() * 64
+            };
+            for (change in changes.vals()) { switch (change) { case (#created(_)) total += 32; case (#replaced(value)) total += 32 + snapshotBytes(value.before); case (#deleted(value)) total += snapshotBytes(value) } };
+            total
         };
 
         func validateSeriesWrite(value : SeriesWrite, replacing : Nat) : ?Error {
@@ -366,7 +595,7 @@ module {
         func keepOverride(requested : ?Text, existing : ?Text) : ?Text {
             switch (requested) { case (?value) ?value; case null existing }
         };
-        func seriesView(item : Memory.EventSeries) : SeriesView { { id = item.id; revision = item.revision; title = item.title; notes = item.notes; location = item.location; color = item.color; availability = item.availability; kind = item.kind; source = sourceText(item.source); time_zone = item.time_zone; recurrence = item.recurrence; created_at_ns = item.created_at_ns; updated_at_ns = item.updated_at_ns } };
+        func seriesView(item : Memory.EventSeries) : SeriesView { { id = item.id; revision = item.revision; title = item.title; notes = item.notes; location = item.location; color = item.color; availability = item.availability; kind = item.kind; source = sourceText(item.source); imported = Array.any<Memory.ImportProvenance>(mem.import_provenance, func(value) { value.series_id == item.id }); time_zone = item.time_zone; recurrence = item.recurrence; created_at_ns = item.created_at_ns; updated_at_ns = item.updated_at_ns } };
         func occurrenceView(item : Memory.Occurrence) : OccurrenceView { let ?(_, series) = findSeries(item.series_id) else { return { id = item.id; revision = item.revision; series_id = item.series_id; series_revision = 0; recurrence_key = item.recurrence_key; start_ns = item.start_ns; end_ns = item.end_ns; title = "Missing series"; notes = ""; location = ""; color = "sage"; availability = #free; kind = #timed; source = "corrupt"; status = "corrupt"; time_zone = "UTC" } }; { id = item.id; revision = item.revision; series_id = series.id; series_revision = series.revision; recurrence_key = item.recurrence_key; start_ns = item.start_ns; end_ns = item.end_ns; title = switch (item.title_override) { case (?value) value; case null series.title }; notes = switch (item.notes_override) { case (?value) value; case null series.notes }; location = switch (item.location_override) { case (?value) value; case null series.location }; color = series.color; availability = series.availability; kind = series.kind; source = sourceText(series.source); status = statusText(item.status); time_zone = series.time_zone } };
         func legacyView(item : Memory.Occurrence) : EventView { let view = occurrenceView(item); { id = view.id; revision = view.revision; start_ns = view.start_ns; end_ns = view.end_ns; title = view.title; notes = view.notes; source = view.source; status = view.status; hold_expires_at_ns = switch (item.status) { case (#hold(expires)) ?expires; case (_) null } } };
         func sourceText(value : Memory.SeriesSource) : Text { switch (value) { case (#owner) "owner"; case (#rendezvous(_)) "rendezvous" } };
@@ -376,10 +605,15 @@ module {
 
     func nowNs() : Nat64 { Nat64.fromNat(Int.abs(Time.now())) };
     func validExternalId(value : Blob) : Bool { Blob.size(value) >= 16 and Blob.size(value) <= 32 };
+    func validImportNamespace(value : Text) : Bool { value.size() > 0 and Validation.textWithin(value, 320) };
+    func validImportUid(value : Text) : Bool { value.size() > 0 and Validation.textWithin(value, 512) };
     func error(code : Text, message : Text, revision : Nat64) : Error { { code; message; revision } };
     func bounds(offset : Nat, requested : Nat, size : Nat, maximum : Nat) : (Nat, Nat) { let limit = if (requested > maximum) maximum else requested; let start = if (offset > size) size else offset; let finish = if (start + limit > size) size else start + limit; (start, finish) };
     func replaceAt<T>(values : [T], index : Nat, value : T) : [T] { Array.tabulate<T>(values.size(), func(i) { if (i == index) value else values[i] }) };
     func removeAt<T>(values : [T], index : Nat) : [T] { Array.tabulate<T>(values.size() - 1, func(i) { if (i < index) values[i] else values[i + 1] }) };
+    func findSeriesIn(values : [Memory.EventSeries], id : Nat64) : ?(Nat, Memory.EventSeries) { var index = 0; while (index < values.size()) { if (values[index].id == id) return ?(index, values[index]); index += 1 }; null };
+    func findImportProvenanceIn(values : [Memory.ImportProvenance], namespace : Text, uid : Text) : ?(Nat, Memory.ImportProvenance) { var index = 0; while (index < values.size()) { let item = values[index]; if (item.source_namespace == namespace and item.external_uid == uid) return ?(index, item); index += 1 }; null };
+    func joinTexts(values : [Text], separator : Text) : Text { var result = ""; var index = 0; while (index < values.size()) { if (index > 0) result #= separator; result #= values[index]; index += 1 }; result };
 
 /*---NEUTRON GENERATED BEGIN---*/
 
@@ -403,6 +637,18 @@ public type calendar_export_v1_Output = ExportPageV1;
 
 public type calendar_search_v1_Input = (wire : Text);
 public type calendar_search_v1_Output = SearchResultV1;
+
+public type calendar_import_index_v1_Input = (request : ImportIndexRequestV1);
+public type calendar_import_index_v1_Output = ImportIndexV1;
+
+public type calendar_import_commit_v1_Input = (request : ImportCommitRequestV1);
+public type calendar_import_commit_v1_Output = ImportCommitResultV1;
+
+public type calendar_bulk_status_v1_Input = (request : BulkStatusRequestV1);
+public type calendar_bulk_status_v1_Output = BulkStatusResultV1;
+
+public type calendar_bulk_undo_v1_Input = (request : BulkUndoRequestV1);
+public type calendar_bulk_undo_v1_Output = BulkUndoResultV1;
 
 public type calendar_series_create_v2_Input = (request : SeriesCreateRequest);
 public type calendar_series_create_v2_Output = SeriesResult;
