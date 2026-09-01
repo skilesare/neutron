@@ -711,6 +711,10 @@ Phase 7 implementation and automated evidence (2026-09-01):
   currently-free suggestion instead of assuming a fixed wall time is unused.
 - The broader Rendezvous browser suite then ran against both upgraded Neutrons:
   15 passed and one opt-in local-II diagnostic was skipped in 2.6 minutes.
+- The combined branch's ordinary fresh-demo fixture was corrected from Calendar
+  0.3.0 to the exact canonical 0.6.6 archive. A clean Alice/Bob reinstall and
+  the same 16-scenario suite then passed again: 15 passed, with only the
+  intentional opt-in diagnostic skipped, in 2.6 minutes.
   Coverage includes reload restoration, mobile Calendar, recurrence CRUD,
   drag/resize and stale rollback, Contacts, exact proposals, counteroffers,
   confirmation, busy-slot rejection, and retry idempotence.
