@@ -728,39 +728,47 @@ of these paths:
 No path in this plan authorizes a Kernel patch. The remaining tasks in this
 phase apply only after the separate publisher architecture is approved.
 
+- [x] Release decision for Calendar 0.6.6: ship ordinary owner-controlled `.ics`
+  export and withhold URL subscription. No companion publisher was approved,
+  no bearer URL or public Calendar surface exists, and the conditional backlog
+  below is not a 0.6.6 release gate.
+
+The following is preserved as a future companion-app backlog, not as unchecked
+Calendar 0.6.6 work.
+
 ### 15.1 Privacy and capability design
 
-- [ ] Default feed state is disabled.
-- [ ] Add disclosure modes:
+- Default feed state is disabled.
+- Add disclosure modes:
   - Busy/Free only: generic title, time, and transparency;
   - titles and times: title/location policy explicitly documented;
   - full details: title, location, and notes with a high-friction warning.
-- [ ] In the separate publisher, use its supported certified/publication API
+- In the separate publisher, use its supported certified/publication API
   with an opaque random 32-byte keyed locator. Never use a principal or
   predictable series ID as the feed secret.
-- [ ] Provide Enable, Copy URL, Refresh, Rotate URL, and Disable/Delete controls.
-- [ ] Rotating deletes the old object before presenting the new URL as active.
+- Provide Enable, Copy URL, Refresh, Rotate URL, and Disable/Delete controls.
+- Rotating deletes the old object before presenting the new URL as active.
   If deletion outcome is uncertain, report uncertainty and do not claim the old
   URL is revoked.
-- [ ] Treat the URL as a bearer secret. Never send it to Agent model context or
+- Treat the URL as a bearer secret. Never send it to Agent model context or
   OpenRouter web tools.
 
 ### 15.2 Projection and reconciliation
 
-- [ ] Generate feed bytes from authoritative Calendar state using the P0
+- Generate feed bytes from authoritative Calendar state using the P0
   serializer and selected disclosure mode.
-- [ ] Store `published_calendar_revision`, content digest, publication
+- Store `published_calendar_revision`, content digest, publication
   revision/tag, and feed status in the companion's memory. Calendar v3 stores
   only owner preferences and non-secret status needed by the approved contract.
-- [ ] Calendar mutation success must not be rolled back merely because feed
+- Calendar mutation success must not be rolled back merely because feed
   publication fails. Mark the feed stale and provide a bounded idempotent refresh
   operation.
-- [ ] Define bounded companion-app status and refresh tools so resident/UI can
+- Define bounded companion-app status and refresh tools so resident/UI can
   reconcile stale or unknown publication outcomes without exposing bearer
   material to Calendar, Agent, or web-search tools.
-- [ ] Refresh after create/update/delete/import/undo/reservation/confirm/release,
+- Refresh after create/update/delete/import/undo/reservation/confirm/release,
   with coalescing so one bulk commit causes one feed projection.
-- [ ] Exclude expired holds and all negotiation/signaling secrets.
+- Exclude expired holds and all negotiation/signaling secrets.
 
 ### 15.3 MIME compatibility decision gate
 
@@ -768,23 +776,23 @@ Any approved separate publisher must prove that its public response has the
 calendar-client semantics required below. The existing Calendar package cannot
 serve this feed itself.
 
-- [ ] Test the exact certified URL with current Google Calendar “From URL” and
+- Test the exact certified URL with current Google Calendar “From URL” and
   Outlook “Subscribe from web.” Record status, redirects, MIME, filename/path,
   initial import, update polling, cancellation, and revocation behavior.
-- [ ] If both accept the current response reliably, document the evidence and
+- If both accept the current response reliably, document the evidence and
   ship the subscription feature.
-- [ ] If either rejects it, omit the subscription feed from P1. Do not patch,
+- If either rejects it, omit the subscription feed from P1. Do not patch,
   fork, or propose a Calendar-coupled Kernel change; keep ordinary `.ics` file
   export through Files.
 
 ### 15.4 Tests
 
-- [ ] Unit-test every disclosure mode and verify forbidden fields are absent.
-- [ ] Test enable, refresh, unchanged no-op, stale reconciliation, rotation,
+- Unit-test every disclosure mode and verify forbidden fields are absent.
+- Test enable, refresh, unchanged no-op, stale reconciliation, rotation,
   disable, deletion uncertainty, package upgrade, and uninstall cleanup.
-- [ ] Test Google and Outlook subscription updates knowing provider polling may
+- Test Google and Outlook subscription updates knowing provider polling may
   take hours. Preserve timestamped evidence rather than assuming immediacy.
-- [ ] Verify anonymous possession of the URL is sufficient and that no other
+- Verify anonymous possession of the URL is sufficient and that no other
   public path enumerates or reveals the locator.
 
 Exit gate: feed is default-off, revocable, certified, privacy-reviewed, and
