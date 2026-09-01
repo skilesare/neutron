@@ -1,11 +1,12 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0 automated qualification and P1 Phase 6 ICS import/undo qualification complete; reminders, the subscription-feed decision, and manual interoperability/Agent acceptance remain release gates
+Status: P0 and P1 import/undo/reminder implementation and Calendar qualification complete through 0.6.5; the fresh two-Neutron regression, subscription-feed decision, and manual interoperability/Agent acceptance remain release gates
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
 Unpublished P0 candidate: Calendar 0.3.0 (`version` `300`)
 Unpublished import candidate: Calendar 0.5.0 (`version` `500`), `calendar` schema v4
+Unpublished reminder candidate: Calendar 0.6.5 (`version` `605`), `calendar` schema remains v4
 Current production Calendar memory: `calendar` schema v2
 Current working Kernel baseline: 0.3.22
 Upstream synchronized for implementation: `infu/neutron` `ccf8595`
@@ -638,19 +639,19 @@ Phase 6 evidence (2026-09-01):
 
 ## 14. Phase 7 — P1 resident reminders and tray
 
-- [ ] Add a Calendar tray only after the Calendar background exists.
-- [ ] Add reminder controls to series and occurrence editors. Start with zero or
+- [x] Add a Calendar tray only after the Calendar background exists.
+- [x] Add reminder controls to series and occurrence editors. Start with zero or
   one reminder offset per event unless product requirements justify more.
-- [ ] The resident queries the next bounded window, schedules browser timers, and
+- [x] The resident queries the next bounded window, schedules browser timers, and
   recomputes after startup, resume, state revision invalidation, clock change,
   and timezone change.
-- [ ] Missed timers must not fire a storm after a long suspension. Define a small
+- [x] Missed timers must not fire a storm after a long suspension. Define a small
   grace window and mark older reminders missed.
-- [ ] Set the tray badge to the number of actionable due reminders, capped by the
+- [x] Set the tray badge to the number of actionable due reminders, capped by the
   Kernel contract.
-- [ ] Tray shows Now, Next, and Today; actions open the event or Rendezvous and
+- [x] Tray shows Now, Next, and Today; actions open the event or Rendezvous and
   support bounded snooze/dismiss state if included in v3.
-- [ ] Explain honestly that no reminder fires while Neutron is closed or the
+- [x] Explain honestly that no reminder fires while Neutron is closed or the
   background is unavailable. Do not call this push notification.
 - [ ] Test lifecycle reload, logout, app update, timezone change, duplicate timer
   prevention, missed reminders, badge clearing, tray accessibility, and narrow
@@ -658,6 +659,39 @@ Phase 6 evidence (2026-09-01):
 
 Exit gate: reminders are deterministic, non-duplicating, and honest about their
 browser-resident lifecycle.
+
+Phase 7 implementation and automated evidence (2026-09-01):
+
+- Calendar 0.6.5 adds bounded series defaults and occurrence overrides using the
+  existing v4 `reminders` collection. No schema or migration bytes changed.
+  Offsets are limited to zero through seven days, records to 4,000, and one
+  schedule page to 200; cancelled occurrences and live holds are suppressed.
+- The owner editor supports one reminder for owner events and read-only confirmed
+  Rendezvous meetings. Mutations retain revision checks, and partial event/reminder
+  failure is reported explicitly instead of claiming atomic success.
+- The resident uses one coalesced refresh promise, a seven-day lookahead,
+  15-minute resume grace, 60-second recovery polling, revision invalidation,
+  saved-timezone projection, and a Kernel badge capped at 99. No browser or OS
+  push behavior is claimed.
+- The tray provides keyboard-dismissable Now, Next, and Today sections. Exact
+  navigation uses the Kernel-compatible bounded route
+  `reminder/<series-id>/<occurrence-id>`; JSON is intentionally not used because
+  `workspace.open_tile` accepts only a 64-character lowercase route token.
+  Snooze/dismiss was not added because the approved v3/v4 design stores only one
+  reminder offset and no snooze state.
+- The focused 420px Playwright acceptance passed in 10.7 seconds after proving
+  durable save, reload, resident recovery, badge, tray, a second reload,
+  exact-event deep link, delete, and title-specific tray cleanup.
+- The complete Calendar release command passed in 22.1 seconds: package, 66 Bun
+  tests, memory restoration, every Motoko domain test, and v1-to-v2,
+  v2-to-v3, and v3-to-v4 migration tests.
+- A freshly reinstalled production Calendar 0.2.0 fixture passed the reviewed
+  in-product update to Calendar 0.6.5 in 36.1 seconds with representative state,
+  installation identity, and schema-v4 memory intact.
+- Remaining lifecycle evidence in the combined bullet is logout-specific and the
+  fresh two-Neutron Calendar/Rendezvous regression. The latter fixture remained
+  CPU-active but did not finish first-time Alice/Bob provisioning within the
+  explicit ten-minute limit; it was stopped cleanly and is not recorded as a pass.
 
 ## 15. Phase 8 — P1 subscription-feed architecture decision
 
@@ -747,7 +781,7 @@ accepted by both target consumers—or P1 ships without the feed.
 
 - [ ] Complete a security/privacy review for ICS import, Agent tools, undo,
   reminder lifecycle, and the bearer subscription URL.
-- [ ] Increase the final Calendar release version strictly above the current
+- [x] Increase the final Calendar release version strictly above the current
   0.5.0 import candidate after any reminder/feed package bytes are added.
 - [x] Run clean initialization and exact v2-to-v3-to-v4 production migration tests with
   representative and maximum-bound data.
@@ -757,7 +791,7 @@ accepted by both target consumers—or P1 ships without the feed.
 - [x] Verify the 0.5.0 import candidate package size and all third-party licenses.
 - [x] Install the 0.5.0 import candidate through a state-preserving in-product upgrade;
   never use reinstall as the production upgrade mechanism.
-- [ ] Review exact archive/source bytes and SHA-256.
+- [x] Review exact archive/source bytes and SHA-256.
 - [ ] STOP before production publication until the owner explicitly authorizes
   it. Then follow `doc/package-updates.md`, publish once, repeat the exact same
   bytes, and require receipt-v2 `batch_id: null` with every selected package and
