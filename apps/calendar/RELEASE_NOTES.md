@@ -1,5 +1,18 @@
 # Calendar release notes
 
+## 0.4.0 — in development
+
+- Adds managed-memory schema v3 for bounded ICS import provenance, reminder
+  offsets, and bulk-operation undo receipts.
+- Migrates Calendar v2 data without changing existing series, occurrences,
+  preferences, revisions, or identifiers. All new P1 collections start empty.
+- Retains the complete v1-to-v2 lineage and adds the deterministic v2-to-v3
+  edge so an installed Calendar can upgrade without reinstalling or losing
+  Rendezvous-owned meetings.
+
+Calendar 0.4.0 is not ready for publication until the remaining P1 import,
+undo, reminder, interoperability, privacy, and release gates are complete.
+
 ## 0.3.0 — unpublished candidate
 
 - Uses one saved IANA time zone consistently for the calendar grid, editor,

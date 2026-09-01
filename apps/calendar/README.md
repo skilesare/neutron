@@ -102,4 +102,4 @@ npm --workspace neutron-calendar test
 
 The package pipeline validates, builds, locks managed memory, creates method
 schemas, runs recurrence/domain/migration suites, and produces
-`apps/calendar/calendar.v0.3.0.neutron`.
+`apps/calendar/calendar.v0.4.0.neutron`.

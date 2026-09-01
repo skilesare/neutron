@@ -4,7 +4,7 @@ import Nat64 "mo:core/Nat64";
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Calendar "../backend/main";
-import Memory "../backend/memory/calendar/v2";
+import Memory "../backend/memory/calendar/v3";
 import TestEnvironment "TestEnvironment";
 
 let minute : Nat = 60_000_000_000;

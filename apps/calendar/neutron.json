@@ -2,7 +2,7 @@
   "format": 3,
   "name": "Calendar",
   "id": "calendar",
-  "version": 300,
+  "version": 400,
   "update_source": "233tv-xiaaa-aaaay-aacta-cai",
   "description": "Private calendar and local availability for installed Neutron apps",
   "src": "main.mo",
@@ -138,13 +138,16 @@
   },
   "memory": {
     "calendar": {
-      "version": 2,
+      "version": 3,
       "schemas": {
         "1": {
           "src": "memory/calendar/v1.mo"
         },
         "2": {
           "src": "memory/calendar/v2.mo"
+        },
+        "3": {
+          "src": "memory/calendar/v3.mo"
         }
       },
       "migrations": [
@@ -152,6 +155,11 @@
           "from": 1,
           "to": 2,
           "src": "memory/calendar/v1_to_v2.mo"
+        },
+        {
+          "from": 2,
+          "to": 3,
+          "src": "memory/calendar/v2_to_v3.mo"
         }
       ]
     }

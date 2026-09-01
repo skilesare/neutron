@@ -7,9 +7,9 @@ import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
 const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "calendar-upgrade-local.ndeploy.json";
-const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.3.0.neutron");
+const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.4.0.neutron");
 
-test("Calendar 0.2.0 state survives the reviewed in-product 0.3.0 update", async ({ browser }) => {
+test("Calendar 0.2.0 state survives the reviewed in-product 0.4.0 update", async ({ browser }) => {
   test.setTimeout(360_000);
   const runtime = resolveLocalNeutronRuntime({ configPath });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: "America/Chicago" });
@@ -54,12 +54,16 @@ test("Calendar 0.2.0 state survives the reviewed in-product 0.3.0 update", async
 
     const afterRuntime = await actor.kernel_runtime_info();
     const afterCalendar = afterRuntime.apps.find((app) => app.scope.app_id === "calendar");
-    expect(Number(afterCalendar?.version)).toBe(300);
+    expect(Number(afterCalendar?.version)).toBe(400);
+    const afterCalendarMemory = afterRuntime.memories.find((memory) => memory.id === "calendar");
+    expect(Number(afterCalendarMemory?.version)).toBe(3);
     expect(String(afterCalendar?.scope.installation_uid)).toBe(String(beforeCalendar?.scope.installation_uid));
-    const beforeMemories = beforeRuntime.memories.map(memoryIdentity);
-    const afterMemories = afterRuntime.memories.map(memoryIdentity);
+    const beforeMemories = beforeRuntime.memories.filter((memory) => memory.id !== "calendar").map(memoryIdentity);
+    const afterMemories = afterRuntime.memories.filter((memory) => memory.id !== "calendar").map(memoryIdentity);
     expect(afterMemories).toEqual(expect.arrayContaining(beforeMemories));
-    expect(afterMemories).toHaveLength(beforeMemories.length);
+    expect(afterRuntime.memories).toHaveLength(beforeRuntime.memories.length);
+    expect(String(afterCalendarMemory?.owner)).toBe(String(beforeMemory?.owner));
+    expect(String(afterCalendarMemory?.schema)).not.toBe(String(beforeMemory?.schema));
 
     const upgraded = await openCalendar(page);
     await expect(upgraded.getByRole("heading", { name: "Export iCalendar" })).toBeVisible();

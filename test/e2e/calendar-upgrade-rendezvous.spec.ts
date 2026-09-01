@@ -9,9 +9,9 @@ import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
 const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "rendezvous-local.ndeploy.json";
-const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.3.0.neutron");
+const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.4.0.neutron");
 
-test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.3.0", async ({ browser }) => {
+test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.4.0", async ({ browser }) => {
   test.setTimeout(360_000);
   const aliceRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
   const bobRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 1 });
@@ -55,12 +55,17 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     await bob.page.reload({ waitUntil: "domcontentloaded" });
     const afterRuntime = await actor.kernel_runtime_info();
     const afterApp = afterRuntime.apps.find((app) => app.scope.app_id === "calendar");
-    expect(Number(afterApp?.version)).toBe(300);
+    expect(Number(afterApp?.version)).toBe(400);
+    const afterCalendarMemory = afterRuntime.memories.find((memory) => memory.id === "calendar");
+    expect(Number(afterCalendarMemory?.version)).toBe(3);
     expect(String(afterApp?.scope.installation_uid)).toBe(String(beforeApp?.scope.installation_uid));
-    const beforeMemories = beforeRuntime.memories.map(memoryIdentity);
-    const afterMemories = afterRuntime.memories.map(memoryIdentity);
+    const beforeCalendarMemory = beforeRuntime.memories.find((memory) => memory.id === "calendar");
+    const beforeMemories = beforeRuntime.memories.filter((memory) => memory.id !== "calendar").map(memoryIdentity);
+    const afterMemories = afterRuntime.memories.filter((memory) => memory.id !== "calendar").map(memoryIdentity);
     expect(afterMemories).toEqual(expect.arrayContaining(beforeMemories));
-    expect(afterMemories).toHaveLength(beforeMemories.length);
+    expect(afterRuntime.memories).toHaveLength(beforeRuntime.memories.length);
+    expect(String(afterCalendarMemory?.owner)).toBe(String(beforeCalendarMemory?.owner));
+    expect(String(afterCalendarMemory?.schema)).not.toBe(String(beforeCalendarMemory?.schema));
 
     const upgraded = await openApp(bob.page, "calendar");
     await expect(upgraded.locator(".fc-event--rendezvous").filter({ hasText: confirmedTitle })).toBeVisible({ timeout: 60_000 });
