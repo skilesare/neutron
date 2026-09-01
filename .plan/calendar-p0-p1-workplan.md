@@ -346,6 +346,18 @@ Phase 2 implementation evidence (automated portion, 2026-08-31):
   Calendar and Outlook web import surfaces checked on 2026-09-01, the exact
   shared `.ics`-bytes requirement, semantic checks, and evidence locations.
   The credentialed provider results remain open until the owner-assisted run.
+- `test/manual/generate-calendar-provider-fixture.ts` now produces one exact
+  provider-import artifact from the reviewed 0.6.6 serializer plus a JSON
+  validation report. The independent `ical.js` gate passed with four events,
+  three Busy and one Free projection, CRLF-only output, a maximum 74-octet
+  physical line, Unicode/escaped-text round-trip, two DST materializations, one
+  override, and no cancelled or tentative-hold content. Generated SHA-256:
+  `10355253e74efc593587394abee4ee6bc2ead046e860412f1612a5ae531f6dc9`.
+  Google and Outlook must import these same 1,463 bytes. The helper and manual
+  evidence live outside Calendar's Complete App Source closure; a full package
+  rerun remained exactly 590,231 bytes with archive SHA-256
+  `9e60e9f7a1a556e563b66e4884d4d8279fa8f65d48562981a5195387c28009bb`,
+  so no release-version bump is required.
 
 ## 9. Phase 3 — P0 bounded backend search and UI filtering
 
@@ -449,6 +461,12 @@ Phase 4 implementation evidence (automated portion, 2026-08-31):
 - `test/manual/calendar-0.6.6-acceptance.md` fixes the exact 0.6.6/Agent 0.3.9
   fixture, live prompts, evidence filenames, owner-consent boundaries, and
   authoritative Calendar reconciliation steps.
+- The owner-assisted fixture was staged on the live PocketIC instance as
+  `calendar-demo` with exact pinned Kernel 0.3.22, Calendar 0.6.6, Agent 0.3.9,
+  and Files 0.4.3 artifacts. The focused installed-package readiness check
+  passed in 6.3 seconds: both resident endpoints reached `ready`, Agent exposed
+  its visible **Connect to OpenRouter** flow, and Calendar remained resident.
+  Credentialed prompts and screenshots remain owner-assisted.
 
 ## 11. P0 release gate — Calendar 0.3.0
 

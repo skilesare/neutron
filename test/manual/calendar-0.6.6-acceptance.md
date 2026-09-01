@@ -13,17 +13,34 @@ evidence only and is not part of the Calendar package source closure.
 
 ## Start and qualify the fixture
 
-1. Stop any other local Neutron using port 8000 cleanly.
-2. From the repository root, run:
+The provisioner supports one supervised localhost gateway on port 8000. If no
+supervisor is running for this worktree, start it in a dedicated terminal and
+leave that expected long-lived command running:
+
+```sh
+node_modules/.bin/bun packages/neutron-provision/src/index.ts calendar-submission-local.ndeploy.json serve
+```
+
+If a different worktree already owns port 8000, do not start a competing
+gateway. Run the following commands from that owning worktree's committed copy
+of `calendar-submission-local.ndeploy.json`; `reinstall` attaches the fixture to
+the live supervisor without deleting its other local Neutron canisters.
+
+1. From the selected repository root, install the disposable fixture:
 
    ```sh
-   node_modules/.bin/bun packages/neutron-provision/src/index.ts calendar-submission-local.ndeploy.json serve
+   node_modules/.bin/bun packages/neutron-provision/src/index.ts calendar-submission-local.ndeploy.json reinstall
    ```
 
-3. Verify `status` reports one complete `calendar-demo` deployment.
-4. Sign in through local Internet Identity, authorize that principal, and open
+2. Verify `status` reports one complete `calendar-demo` deployment:
+
+   ```sh
+   node_modules/.bin/bun packages/neutron-provision/src/index.ts calendar-submission-local.ndeploy.json status
+   ```
+
+3. Sign in through local Internet Identity, authorize that principal, and open
    Calendar and Agent from the launcher.
-5. Confirm Calendar's installed version is 606 and its `calendar` memory is
+4. Confirm Calendar's installed version is 606 and its `calendar` memory is
    schema v4 before collecting evidence.
 
 ## Agent 0.3.9 acceptance
@@ -89,16 +106,31 @@ without retry.
 
 ## Google Calendar file import
 
+Generate the deterministic provider-acceptance file and its independent-parser
+report from the reviewed Calendar 0.6.6 serializer:
+
+```sh
+node_modules/.bin/bun test/manual/generate-calendar-provider-fixture.ts
+```
+
+Use the resulting exact file at
+`test-evidence/calendar-0.6.6/calendar-provider-import.ics` for both providers.
+Its validation report fixes the SHA-256, byte count, expected four events,
+Busy/Free counts, CRLF/folding checks, and verifies that cancelled events and
+tentative holds were filtered before the credentialed import. Do not edit or
+regenerate the file between provider runs.
+
 Current official desktop/web navigation checked 2026-09-01:
 
 - <https://support.google.com/calendar/answer/37118?hl=en>
 - Google Calendar → **Settings** → **Import & export** → **Select file from
   your computer** → choose a destination calendar → **Import**.
 
-Generate a detail-enabled Calendar 0.6.6 export through the installed UI and
-download it from Files. Import that exact `.ics` file. Record the Google product
-surface, account type, browser/version, time zone, run time, imported/total
-count, and screenshots. Verify:
+The deterministic artifact exercises the same detail-enabled Calendar 0.6.6
+serializer and exclusion defaults as the installed Files handoff already
+covered by `test/e2e/calendar-p0-gates.spec.ts`. Import that exact `.ics` file.
+Record the Google product surface, account type, browser/version, time zone,
+run time, imported/total count, and screenshots. Verify:
 
 - timed and all-day events;
 - Busy and Free transparency;
