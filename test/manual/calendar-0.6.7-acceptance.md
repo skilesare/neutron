@@ -1,14 +1,14 @@
-# Calendar 0.6.6 manual acceptance
+# Calendar 0.6.7 manual acceptance
 
 Run date: pending
 
 This is the owner-assisted portion of the Calendar release gate. It uses the
 exact local fixture in `calendar-submission-local.ndeploy.json`: stock Kernel
-0.3.22, Calendar 0.6.6, Agent 0.3.9, and Files 0.4.3. Do not substitute an
+0.3.22, Calendar 0.6.7, Agent 0.3.9, and Files 0.4.3. Do not substitute an
 unpublished rebuild from the combined branch; `calendar-hackathon` is the
 authoritative Calendar package source.
 
-Store screenshots under `test-evidence/calendar-0.6.6/`. That directory is
+Store screenshots under `test-evidence/calendar-0.6.7/`. That directory is
 evidence only and is not part of the Calendar package source closure.
 
 ## Start and qualify the fixture
@@ -40,7 +40,7 @@ the live supervisor without deleting its other local Neutron canisters.
 
 3. Sign in through local Internet Identity, authorize that principal, and open
    Calendar and Agent from the launcher.
-4. Confirm Calendar's installed version is 606 and its `calendar` memory is
+4. Confirm Calendar's installed version is 607 and its `calendar` memory is
    schema v4 before collecting evidence.
 
 ## Agent 0.3.9 acceptance
@@ -107,14 +107,14 @@ without retry.
 ## Google Calendar file import
 
 Generate the deterministic provider-acceptance file and its independent-parser
-report from the reviewed Calendar 0.6.6 serializer:
+report from the unchanged, reviewed Calendar 0.6.6/0.6.7 serializer:
 
 ```sh
-node_modules/.bin/bun test/manual/generate-calendar-provider-fixture.ts
+node_modules/.bin/bun test/manual/generate-calendar-provider-fixture.ts test-evidence/calendar-0.6.7/calendar-provider-import.ics
 ```
 
 Use the resulting exact file at
-`test-evidence/calendar-0.6.6/calendar-provider-import.ics` for both providers.
+`test-evidence/calendar-0.6.7/calendar-provider-import.ics` for both providers.
 Its validation report fixes the SHA-256, byte count, expected four events,
 Busy/Free counts, CRLF/folding checks, and verifies that cancelled events and
 tentative holds were filtered before the credentialed import. Do not edit or
@@ -126,7 +126,7 @@ Current official desktop/web navigation checked 2026-09-01:
 - Google Calendar → **Settings** → **Import & export** → **Select file from
   your computer** → choose a destination calendar → **Import**.
 
-The deterministic artifact exercises the same detail-enabled Calendar 0.6.6
+The deterministic artifact exercises the same detail-enabled Calendar 0.6.7
 serializer and exclusion defaults as the installed Files handoff already
 covered by `test/e2e/calendar-p0-gates.spec.ts`. Import that exact `.ics` file.
 Record the Google product surface, account type, browser/version, time zone,

@@ -14,7 +14,7 @@
     "kind": "inline",
     "kernel": { "path": "apps/kernel/kernel.v0.3.22.neutron" },
     "packages": [
-      { "path": "apps/calendar/calendar.v0.6.6.neutron" },
+      { "path": "apps/calendar/calendar.v0.6.7.neutron" },
       { "path": "apps/agent/agent.v0.3.9.neutron" },
       { "path": "apps/vfs/files.v0.4.3.neutron" }
     ]

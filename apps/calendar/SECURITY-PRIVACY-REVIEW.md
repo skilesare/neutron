@@ -59,9 +59,10 @@ still requires the production process and explicit owner authorization.
   schema-v4 state preserved.
 - Focused 0.6.7 reminder/tray browser acceptance passed with reload, timezone
   change, exact badge count, tray navigation/cleanup, and logout cleanup.
-- Fresh two-Neutron Calendar/Rendezvous upgrade: passed on Alice and Bob with a
+- Fresh two-Neutron Calendar/Rendezvous 0.2.0→0.6.7 upgrade: passed on Alice and Bob with a
   confirmed meeting and interrupted live hold preserved.
-- Full upgraded Rendezvous suite: 15 passed; one opt-in diagnostic skipped.
+- Full upgraded Rendezvous suite against Calendar 0.6.7: 15 passed in 2.7
+  minutes; one opt-in diagnostic skipped.
 
 ## Deferred risks
 

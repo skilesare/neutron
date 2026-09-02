@@ -147,7 +147,7 @@ test("Calendar resident and Agent 0.3.9 start together for live owner qualificat
   try {
     const runtimeInfo = await session.actor.kernel_runtime_info();
     const installedVersion = (appId: string) => Number(runtimeInfo.apps.find((app) => app.scope.app_id === appId)?.version);
-    expect(installedVersion("calendar")).toBe(606);
+    expect(installedVersion("calendar")).toBe(607);
     expect(installedVersion("agent")).toBe(309);
     expect(installedVersion("files")).toBe(403);
     expect(Number(runtimeInfo.memories.find((memory) => memory.id === "calendar")?.version)).toBe(4);
