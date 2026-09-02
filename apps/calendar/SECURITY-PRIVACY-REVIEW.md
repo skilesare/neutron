@@ -77,8 +77,10 @@ still requires the production process and explicit owner authorization.
 
 ## Deferred risks
 
-- Google Calendar and Outlook are external products. Manual file-import
-  qualification remains required and must record the date and product surface.
+- Google Calendar and Outlook are external products. Google Calendar web
+  imported all four provider fixtures on 2026-09-02 and the owner visually
+  confirmed their expected dates. Outlook remains recommended follow-up
+  interoperability evidence.
 - There are no background or OS push notifications. Reminders cannot fire while
   Neutron or its Calendar resident is unavailable.
 - A bearer subscription feed is deliberately withheld. Do not reuse this review
