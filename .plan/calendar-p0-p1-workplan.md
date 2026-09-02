@@ -1,12 +1,12 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0 and P1 import/undo/reminder implementation and automated Calendar qualification complete through 0.6.6; Calendar 0.6.7 Agent-interoperability fixes are in progress after live acceptance exposed two app-side defects; manual interoperability/Agent acceptance remain release gates
+Status: P0 and P1 import/undo/reminder implementation and automated Calendar qualification complete through 0.6.7; Calendar 0.6.8 status-tool preapproval correction is in progress after live acceptance exposed the remaining manifest omission; manual interoperability/Agent acceptance remain release gates
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
 Unpublished P0 candidate: Calendar 0.3.0 (`version` `300`)
 Unpublished import candidate: Calendar 0.5.0 (`version` `500`), `calendar` schema v4
-Unpublished Agent-interoperability candidate: Calendar 0.6.7 (`version` `607`), `calendar` schema remains v4
+Unpublished Agent-interoperability candidate: Calendar 0.6.8 (`version` `608`), `calendar` schema remains v4
 Current production Calendar memory: `calendar` schema v2
 Current working Kernel baseline: 0.3.22
 Upstream synchronized for implementation: `infu/neutron` `ccf8595`
@@ -510,12 +510,49 @@ Live Agent acceptance finding and 0.6.7 corrective work (2026-09-02):
   drag/resize and stale rollback, Calendar handoff, Contacts selection and
   revalidation, exact-time delivery, counterproposal confirmation, private
   meeting confirmation, busy-slot refusal, and exactly-once Safe retry.
-- [ ] Install the exact tested 0.6.7 package into the owner-assisted fixture by
-  the normal state-preserving in-product update path, verify both duplicate
-  events survived the upgrade, delete only series 2 after authoritative re-read,
-  and repeat create/find/update/delete acceptance without blind retries.
-- [ ] Capture the successful Agent review and authoritative Calendar result;
-  the 0.6.6 transcript is retained as failure evidence, not a passing artifact.
+- [x] Install the exact tested 0.6.7 package into a clean owner-assisted fixture
+  and reconcile its successful one-time create against authoritative Calendar
+  state. The earlier dirty-fixture duplicate cleanup is superseded by this clean
+  run; no blind retry or destructive fixture reset was used.
+- [x] Capture the successful 0.6.7 Agent result and authoritative Calendar
+  values. The 0.6.6 transcript is retained as failure evidence, not a passing
+  artifact.
+
+Live Calendar 0.6.7 Agent result and 0.6.8 follow-up (2026-09-02):
+
+- [x] Verify the two original corrections in a clean owner-assisted fixture.
+  One event titled `Agent acceptance 0.6.7` committed successfully with series
+  id/revision `1`/`1`, UTC `2026-09-03T14:00:00Z`–`14:30:00Z`, Busy, no
+  warnings, and no duplicate retry.
+- [x] Confirm `get_tool_schema` activity is expected Agent behavior: Agent
+  inspects each app method contract before calling it.
+- [x] Diagnose the remaining noise: the semantic `status` tool calls the
+  existing `calendar_status` backend query, but Calendar's manifest omitted
+  that method from `preapproved_self_calls`; repeated attempts failed before
+  dispatch. `reminder_snapshot` supplied the time zone only as a fallback.
+- [x] Prepare Calendar 0.6.8 with `calendar_status` added to the app's bounded
+  preapproved self-call list and a manifest regression. This is an app package
+  capability correction; it changes no Kernel code or persistent memory.
+- [x] Run the complete 0.6.8 package/memory/domain suite: package plus 69 Bun
+  tests and every Motoko domain, restoration, and migration program passed in
+  20.0 seconds.
+- [x] Upgrade the live owner fixture through the ordinary in-product UI from
+  exact Calendar 0.6.7 to 0.6.8. The focused regression passed in 32.7 seconds
+  and proved schema v4, installation identity, memory owner/schema, and the
+  exact `Agent acceptance 0.6.7` event were preserved. The post-upgrade Calendar
+  0.6.8 + Agent 0.3.9 + Files 0.4.3 resident readiness check passed in 8.0
+  seconds.
+- [x] Run the standard 0.2.0→0.6.8 state-preserving browser upgrade against an
+  isolated disposable fixture: timed, recurring, overridden, all-day,
+  location, notes, availability, installation identity, unrelated memories,
+  and the v2→v4 memory transition all passed in 36.0 seconds.
+- [x] Run focused 0.6.8 reminder/tray acceptance against the upgraded isolated
+  fixture: reload, time-zone change, exact badge, tray navigation/cleanup, and
+  logout cleanup passed in 11.6 seconds.
+- [ ] Sync exact 0.6.8 changes into the combined branch, then run the two-Neutron
+  Calendar/Rendezvous upgrade and full combined regression suite.
+- [ ] Repeat live Agent create/find/update/delete acceptance on exact 0.6.8 and
+  capture a clean transcript where `status` succeeds directly.
 
 ## 11. P0 release gate — Calendar 0.3.0
 
@@ -927,6 +964,21 @@ Calendar 0.6.7 corrective candidate evidence (2026-09-02):
 - production publication remains explicitly unauthorized and must not occur
   until the remaining live Agent and Google/Outlook gates pass and the owner
   separately authorizes the production workflow.
+
+Calendar 0.6.8 status-preapproval candidate evidence (2026-09-02):
+
+- archive: `apps/calendar/calendar.v0.6.8.neutron`, 590,267 bytes,
+  SHA-256 `5c8c9df75cd17121f2218ff5a2b299b61e230cac5c3418b797cb2d64189451cb`;
+- offered source:
+  `fbebdc55f64c98229053b44a8e2b75462832b12794bd4df4b0f7ec0781af6179.source.v1.msgpack.gz`,
+  487,578 bytes, SHA-256
+  `fbebdc55f64c98229053b44a8e2b75462832b12794bd4df4b0f7ec0781af6179`;
+- an immediate unchanged rebuild reproduced the same archive size/hash and
+  reused the same content-addressed offered-source artifact;
+- the package changes only Calendar's manifest preapproval, version, tests, and
+  documentation. Kernel code, backend code/API, schema-v4 memory, and migration
+  lineage are unchanged;
+- production publication remains explicitly unauthorized.
 
 ## 17. Cross-cutting test matrix
 

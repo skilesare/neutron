@@ -1,15 +1,15 @@
-# Calendar 0.6.7 security and privacy review
+# Calendar 0.6.8 security and privacy review
 
 Review date: 2026-09-02
 
-Scope: the unpublished Calendar 0.6.7 candidate, including iCalendar import and
+Scope: the unpublished Calendar 0.6.8 candidate, including iCalendar import and
 export, Agent tools, bulk undo, browser-resident reminders, and the existing
 Rendezvous availability contract. A public subscription feed is not present in
 this release and is therefore not represented as reviewed or available.
 
 ## Result
 
-No release-blocking issue was found in the implemented 0.6.7 scope. Calendar
+No release-blocking issue was found in the implemented 0.6.8 scope. Calendar
 keeps one managed `calendar` root at schema v4, uses only self-scoped frontend
 and Agent calls, and adds no Kernel or certified-assets capability. Publication
 still requires the production process and explicit owner authorization.
@@ -23,7 +23,7 @@ still requires the production process and explicit owner authorization.
 | Calendar to Files | One owner-prepared `.ics` snapshot | Requires the ordinary reviewed cross-app write. Files receives only the selected projection, not Calendar memory. An export with details enabled is intentionally sensitive. |
 | Calendar to Agent/model context | Bounded semantic tool arguments/results | Tool outputs can include the event fields the owner asked Agent to read or change. Export returns an owner action, never raw `.ics`. Import preview returns compact UID/title/start/count/category summaries, never raw bytes, notes, or locations. Private Calendar text must not be copied into web-search queries. Identifier inputs accept decimal strings or safe nonnegative JSON integers and normalize to strings before canister calls; unsafe numeric values are rejected. |
 | Browser-selected import to Calendar | One file, at most 1 MiB | Parsing occurs in a killable local worker with line/property/component/text/series/occurrence limits. Scheduling messages, attendees, organizers, alarms, and attachments are rejected or diagnosed. Selecting a file is non-mutating. |
-| Calendar to a public subscription URL | Nothing | No feed, token, public route, or certified Calendar object exists in 0.6.7. A future companion publisher requires its own threat model and real Google/Outlook qualification. |
+| Calendar to a public subscription URL | Nothing | No feed, token, public route, or certified Calendar object exists in 0.6.8. A future companion publisher requires its own threat model and real Google/Outlook qualification. |
 
 ## Mutation and recovery review
 
@@ -55,8 +55,18 @@ still requires the production process and explicit owner authorization.
   Motoko domain tests, memory restoration, and v1→v2→v3→v4 migrations passed.
 - Focused reminder acceptance: passed at 420 px with reload, timezone change,
   exact badge count, tray navigation/cleanup, and logout cleanup.
-- Exact in-product Calendar 0.2.0→0.6.7 upgrade: passed with installation and
-  schema-v4 state preserved.
+- Exact owner-fixture in-product Calendar 0.6.7→0.6.8 upgrade: passed in 32.7
+  seconds with installation identity, memory ownership/schema v4, and the exact
+  Agent-created event preserved.
+- Post-upgrade Calendar 0.6.8, Agent 0.3.9, and Files 0.4.3 resident readiness:
+  passed in 8.0 seconds with the already-connected Agent state recognized.
+- Standard in-product Calendar 0.2.0→0.6.8 upgrade: passed in 36.0 seconds with
+  timed, recurring, overridden, all-day, location, notes, availability,
+  installation identity, unrelated memories, and the v2→v4 transition
+  preserved.
+- Focused 0.6.8 reminder/tray browser acceptance: passed in 11.6 seconds with
+  reload, time-zone change, exact badge count, tray navigation/cleanup, and
+  logout cleanup.
 - Focused 0.6.7 reminder/tray browser acceptance passed with reload, timezone
   change, exact badge count, tray navigation/cleanup, and logout cleanup.
 - Fresh two-Neutron Calendar/Rendezvous 0.2.0→0.6.7 upgrade: passed on Alice and Bob with a

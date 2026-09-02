@@ -1,5 +1,24 @@
 # Calendar release notes
 
+## 0.6.8 — unpublished candidate
+
+- Preapproves Calendar's existing `calendar_status` self-query so the semantic
+  `status` tool can read the saved time zone, revision, and event count without
+  a redundant permission failure.
+- Adds a manifest regression proving the status backend method remains in the
+  app's bounded preapproved self-call set.
+- Changes no Kernel code, backend API, persistent state, or schema-v4 memory
+  lineage. Calendar 0.6.7 data upgrades in place.
+
+Calendar 0.6.8 follows a successful live 0.6.7 Agent create that exposed this
+remaining manifest omission. Its complete package/memory/domain suite passed,
+and a normal in-product 0.6.7-to-0.6.8 upgrade preserved schema v4,
+installation identity, memory ownership, and the exact Agent-created event.
+Its standard 0.2.0-to-0.6.8 state-preserving upgrade and focused reminder/tray
+acceptance also passed. It remains unpublished pending its cross-app suites, a
+clean live Agent rerun, manual Google and Outlook import, and explicit
+publication authorization.
+
 ## 0.6.7 — unpublished candidate
 
 - Accepts model-emitted safe JSON integers for Calendar identifiers and
