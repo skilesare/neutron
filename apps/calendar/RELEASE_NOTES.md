@@ -14,10 +14,10 @@ Calendar 0.6.8 follows a successful live 0.6.7 Agent create that exposed this
 remaining manifest omission. Its complete package/memory/domain suite passed,
 and a normal in-product 0.6.7-to-0.6.8 upgrade preserved schema v4,
 installation identity, memory ownership, and the exact Agent-created event.
-Its standard 0.2.0-to-0.6.8 state-preserving upgrade and focused reminder/tray
-acceptance also passed. It remains unpublished pending its cross-app suites, a
-clean live Agent rerun, manual Google and Outlook import, and explicit
-publication authorization.
+Its standard 0.2.0-to-0.6.8 state-preserving upgrade, focused reminder/tray
+acceptance, two-Neutron Calendar/Rendezvous upgrade, and full combined
+regression suite also passed. It remains unpublished pending a clean live Agent
+rerun, manual Google and Outlook import, and explicit publication authorization.
 
 ## 0.6.7 — unpublished candidate
 

@@ -69,9 +69,10 @@ still requires the production process and explicit owner authorization.
   logout cleanup.
 - Focused 0.6.7 reminder/tray browser acceptance passed with reload, timezone
   change, exact badge count, tray navigation/cleanup, and logout cleanup.
-- Fresh two-Neutron Calendar/Rendezvous 0.2.0→0.6.7 upgrade: passed on Alice and Bob with a
-  confirmed meeting and interrupted live hold preserved.
-- Full upgraded Rendezvous suite against Calendar 0.6.7: 15 passed in 2.7
+- Fresh two-Neutron Calendar/Rendezvous 0.2.0→0.6.8 upgrade: passed in 1.1
+  minutes on Alice and Bob with confirmed meeting, interrupted live hold,
+  installation identities, memory ownership, and schema-v4 state preserved.
+- Full upgraded Rendezvous suite against Calendar 0.6.8: 15 passed in 3.0
   minutes; one opt-in diagnostic skipped.
 
 ## Deferred risks

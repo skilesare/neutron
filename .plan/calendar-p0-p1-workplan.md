@@ -1,6 +1,6 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0 and P1 import/undo/reminder implementation and automated Calendar qualification complete through 0.6.7; Calendar 0.6.8 status-tool preapproval correction is in progress after live acceptance exposed the remaining manifest omission; manual interoperability/Agent acceptance remain release gates
+Status: P0 and P1 import/undo/reminder implementation and automated Calendar/Rendezvous qualification complete through 0.6.8; live direct-status and manual interoperability/Agent acceptance remain release gates
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
@@ -549,8 +549,15 @@ Live Calendar 0.6.7 Agent result and 0.6.8 follow-up (2026-09-02):
 - [x] Run focused 0.6.8 reminder/tray acceptance against the upgraded isolated
   fixture: reload, time-zone change, exact badge, tray navigation/cleanup, and
   logout cleanup passed in 11.6 seconds.
-- [ ] Sync exact 0.6.8 changes into the combined branch, then run the two-Neutron
-  Calendar/Rendezvous upgrade and full combined regression suite.
+- [x] Sync exact 0.6.8 changes into the combined branch. The two-Neutron
+  Calendar/Rendezvous 0.2.0→0.6.8 upgrade passed in 1.1 minutes with confirmed
+  meeting, interrupted hold, installation identities, memory ownership, and
+  schema-v4 state preserved on both peers. The full upgraded suite then passed
+  15 scenarios in 3.0 minutes with its one opt-in owner diagnostic skipped.
+  After source-included evidence notes finalized the archive, both gates were
+  repeated against exact SHA-256 `d739ba5e5d828bb45f56a5cf153cb3c0f719a3132c26ab68bbd48548147654fe`:
+  the upgrade again passed in 1.1 minutes and 15 scenarios passed in 2.8 minutes
+  with the same diagnostic skip.
 - [ ] Repeat live Agent create/find/update/delete acceptance on exact 0.6.8 and
   capture a clean transcript where `status` succeeds directly.
 
@@ -967,12 +974,12 @@ Calendar 0.6.7 corrective candidate evidence (2026-09-02):
 
 Calendar 0.6.8 status-preapproval candidate evidence (2026-09-02):
 
-- archive: `apps/calendar/calendar.v0.6.8.neutron`, 590,267 bytes,
-  SHA-256 `5c8c9df75cd17121f2218ff5a2b299b61e230cac5c3418b797cb2d64189451cb`;
+- archive: `apps/calendar/calendar.v0.6.8.neutron`, 590,265 bytes,
+  SHA-256 `d739ba5e5d828bb45f56a5cf153cb3c0f719a3132c26ab68bbd48548147654fe`;
 - offered source:
-  `fbebdc55f64c98229053b44a8e2b75462832b12794bd4df4b0f7ec0781af6179.source.v1.msgpack.gz`,
-  487,578 bytes, SHA-256
-  `fbebdc55f64c98229053b44a8e2b75462832b12794bd4df4b0f7ec0781af6179`;
+  `7bd43966b9da02ccff69d7ae0aa9e8286880d4ccdc6910273892dc75f02045e0.source.v1.msgpack.gz`,
+  487,588 bytes, SHA-256
+  `7bd43966b9da02ccff69d7ae0aa9e8286880d4ccdc6910273892dc75f02045e0`;
 - an immediate unchanged rebuild reproduced the same archive size/hash and
   reused the same content-addressed offered-source artifact;
 - the package changes only Calendar's manifest preapproval, version, tests, and
