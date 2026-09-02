@@ -17,9 +17,10 @@
 
 Calendar 0.6.7 was created after owner-assisted Agent acceptance exposed a
 provider/tool interoperability defect in 0.6.6. Its complete package/domain/
-migration suite and state-preserving 0.2.0 upgrade passed. It remains unpublished
-pending the two-Neutron Rendezvous regression, repeated live Agent acceptance,
-manual Google/Outlook import, and explicit publication authorization.
+migration suite, state-preserving 0.2.0 upgrade, two-Neutron Calendar/Rendezvous
+upgrade, and full combined regression suite passed. It remains unpublished
+pending repeated live Agent acceptance, manual Google/Outlook import, and
+explicit publication authorization.
 
 ## 0.6.6 — unpublished candidate
 

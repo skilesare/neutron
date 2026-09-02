@@ -500,8 +500,16 @@ Live Agent acceptance finding and 0.6.7 corrective work (2026-09-02):
   migration suites: 69 Bun tests plus all Motoko programs passed in 19.4 seconds.
   The focused state-preserving 0.2.0→0.6.7 browser upgrade passed in 33.3 seconds,
   and reminder/tray acceptance passed in 12.4 seconds.
-- [ ] Run the Calendar/Rendezvous two-Neutron cross-app upgrade and full
-  Rendezvous regression suites against the exact 0.6.7 candidate.
+- [x] Run the Calendar/Rendezvous two-Neutron cross-app upgrade against the
+  exact main-branch 0.6.7 candidate: confirmed meeting, interrupted live hold,
+  installation identity, memory ownership, and schema-v4 state survived on
+  Alice and Bob in 58.9 seconds.
+- [x] Run the full combined Rendezvous regression suite with both peers left on
+  Calendar 0.6.7: 15 passed in 2.7 minutes and the explicit opt-in diagnostic
+  was skipped. This covers joint reload, mobile Calendar, recurrence CRUD,
+  drag/resize and stale rollback, Calendar handoff, Contacts selection and
+  revalidation, exact-time delivery, counterproposal confirmation, private
+  meeting confirmation, busy-slot refusal, and exactly-once Safe retry.
 - [ ] Install the exact tested 0.6.7 package into the owner-assisted fixture by
   the normal state-preserving in-product update path, verify both duplicate
   events survived the upgrade, delete only series 2 after authoritative re-read,
@@ -906,6 +914,23 @@ Final 0.6.6 artifact evidence (2026-09-01):
 - certified-asset/feed tests are not applicable because the capability is
   deliberately absent. All other listed package, parser, Agent, tray,
   Playwright, upgrade, and cross-app suites passed.
+
+Calendar 0.6.7 corrective candidate evidence (2026-09-02):
+
+- archive: `apps/calendar/calendar.v0.6.7.neutron`, 590,267 bytes,
+  SHA-256 `97010c4bfed14c501847c251c4e76481c13c3d0ec6288d44797a9a2c515d0e4e`;
+- offered source:
+  `5da1279f22a82fe0a8cd1680db0be61ce8db58f15160a84928f326bcb32bf00d.source.v1.msgpack.gz`,
+  487,043 bytes, SHA-256
+  `5da1279f22a82fe0a8cd1680db0be61ce8db58f15160a84928f326bcb32bf00d`;
+- an immediate unchanged rebuild reproduced the same archive size/hash and
+  reused the same content-addressed offered-source artifact;
+- Calendar memory remains schema v4 with the exact released schema and
+  migration hashes; the corrective release changes only frontend Agent-tool
+  interoperability, tests, documentation, and release version;
+- production publication remains explicitly unauthorized and must not occur
+  until the remaining live Agent and Google/Outlook gates pass and the owner
+  separately authorizes the production workflow.
 
 ## 17. Cross-cutting test matrix
 
