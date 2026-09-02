@@ -1,11 +1,13 @@
 import { Principal } from "@dfinity/principal";
 import { expect, test, type Browser, type BrowserContext, type FrameLocator, type Page } from "@playwright/test";
+import { resolve } from "node:path";
 import { localCanisterOrigin } from "neutron-tools/src/runtime.js";
 import { createKernelActor, localIdentityFromSeed } from "../../packages/neutron-provision/src/kernel.ts";
 import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src/local_session.ts";
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
 const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "calendar-submission-local.ndeploy.json";
+const correctionArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.8.neutron");
 
 test("Calendar create, search, and edit are keyboard operable at narrow width", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -147,7 +149,7 @@ test("Calendar resident and Agent 0.3.9 start together for live owner qualificat
   try {
     const runtimeInfo = await session.actor.kernel_runtime_info();
     const installedVersion = (appId: string) => Number(runtimeInfo.apps.find((app) => app.scope.app_id === appId)?.version);
-    expect(installedVersion("calendar")).toBe(607);
+    expect(installedVersion("calendar")).toBe(608);
     expect(installedVersion("agent")).toBe(309);
     expect(installedVersion("files")).toBe(403);
     expect(Number(runtimeInfo.memories.find((memory) => memory.id === "calendar")?.version)).toBe(4);
@@ -161,12 +163,63 @@ test("Calendar resident and Agent 0.3.9 start together for live owner qualificat
     await expect(session.page.locator('[data-tid="launcher-tile-calendar-main"]')).toBeVisible();
     await session.page.locator('[data-tid="launcher-tile-agent-chat"]').click();
     const agent = session.page.frameLocator('[data-app-id="agent"][data-tile-id="chat"]').last();
-    await expect(agent.getByRole("button", { name: "Connect to OpenRouter" })).toBeVisible({ timeout: 60_000 });
+    await expect(agent.getByRole("button", { name: /Connect to OpenRouter|OpenRouter connected/u })).toBeVisible({ timeout: 60_000 });
     await expect(calendarBackground).toHaveAttribute("data-resident-launch", "ready");
   } finally {
     await closeAuthorizedSession(session);
   }
 });
+
+test("live 0.6.7 Agent event survives the in-product 0.6.8 correction", async ({ browser }) => {
+  test.skip(process.env.CALENDAR_AGENT_CORRECTION !== "1", "owner-assisted correction fixture only");
+  test.setTimeout(360_000);
+  const session = await authorizedSession(browser);
+  try {
+    const before = await session.actor.kernel_runtime_info();
+    const beforeCalendar = before.apps.find((app) => app.scope.app_id === "calendar");
+    const beforeMemory = before.memories.find((memory) => memory.id === "calendar");
+    expect(Number(beforeCalendar?.version)).toBe(607);
+    expect(Number(beforeMemory?.version)).toBe(4);
+
+    let calendar = await openCalendar(session.page);
+    const search = calendar.getByRole("searchbox", { name: "Words" });
+    await search.fill("Agent acceptance 0.6.7");
+    await expect(calendar.locator(".search-results button").filter({ hasText: "Agent acceptance 0.6.7" }).first()).toBeVisible({ timeout: 60_000 });
+
+    await uploadCorrection(session.page);
+    await session.page.reload({ waitUntil: "domcontentloaded" });
+    const after = await session.actor.kernel_runtime_info();
+    const afterCalendar = after.apps.find((app) => app.scope.app_id === "calendar");
+    const afterMemory = after.memories.find((memory) => memory.id === "calendar");
+    expect(Number(afterCalendar?.version)).toBe(608);
+    expect(Number(afterMemory?.version)).toBe(4);
+    expect(String(afterCalendar?.scope.installation_uid)).toBe(String(beforeCalendar?.scope.installation_uid));
+    expect(String(afterMemory?.owner)).toBe(String(beforeMemory?.owner));
+    expect(String(afterMemory?.schema)).toBe(String(beforeMemory?.schema));
+
+    calendar = await openCalendar(session.page);
+    await calendar.getByRole("searchbox", { name: "Words" }).fill("Agent acceptance 0.6.7");
+    await expect(calendar.locator(".search-results button").filter({ hasText: "Agent acceptance 0.6.7" }).first()).toBeVisible({ timeout: 60_000 });
+  } finally {
+    await closeAuthorizedSession(session);
+  }
+});
+
+async function uploadCorrection(page: Page) {
+  await page.locator('[data-tid="launcher-open"]').click();
+  await expect(page.locator('[data-tid="launcher"]')).toBeVisible();
+  const chooser = page.waitForEvent("filechooser");
+  await page.locator('[data-tid="launcher-install-package"]').click();
+  await (await chooser).setFiles(correctionArchive);
+  const dialog = page.locator('[data-tid="install-dialog"]');
+  await expect(dialog.getByRole("heading", { name: "Update application" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-tid="install-compiled"]')).toBeVisible({ timeout: 180_000 });
+  await expect(page.locator('[data-tid="install-accept"]')).toHaveText("Update");
+  await page.locator('[data-tid="install-accept"]').click();
+  await expect(page.locator('[data-tid="install-progress"]')).toBeVisible();
+  await expect(page.locator('[data-tid="install-progress"]')).not.toBeVisible({ timeout: 180_000 });
+  await expect(page.locator('[data-tid="install-error"]')).not.toBeVisible();
+}
 
 type Runtime = ReturnType<typeof resolveLocalNeutronRuntime>;
 type Session = {

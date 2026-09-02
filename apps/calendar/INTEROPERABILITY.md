@@ -1,6 +1,6 @@
 # Calendar interoperability guide
 
-Calendar 0.6.7 produces standard `.ics` files for one event, the visible range,
+Calendar 0.6.8 produces standard `.ics` files for one event, the visible range,
 or the complete bounded calendar. It does not publish a subscription URL.
 
 ## Prepare and download a file
@@ -37,7 +37,7 @@ and Outlook on the web can differ.
 
 ## Subscription from URL
 
-There is no Calendar subscription URL in 0.6.7. Calendar cannot add certified
+There is no Calendar subscription URL in 0.6.8. Calendar cannot add certified
 assets while preserving the released installation capability shape, and no
 Kernel change is permitted. Do not paste a local Neutron URL into Google or
 Outlook and describe it as a supported feed.
@@ -56,4 +56,4 @@ cached copies.
 | 2026-09-01 | Automated RFC 5545 serializer/parser qualification | Passed deterministic fixtures, UTF-8 folding, recurrence-instance projection, Busy-only redaction, and `ical.js` parsing. |
 | Pending | Current Google Calendar web file import | Manual owner/account test required. |
 | Pending | Current Outlook web file import | Manual owner/account test required. |
-| Not applicable | Google/Outlook URL subscription | Withheld: Calendar 0.6.7 exposes no feed URL. |
+| Not applicable | Google/Outlook URL subscription | Withheld: Calendar 0.6.8 exposes no feed URL. |

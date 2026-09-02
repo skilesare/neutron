@@ -5,13 +5,13 @@ import { validate_neutron_conf } from "neutron-tools/src/validate_schema.js";
 
 const manifestUrl = new URL("../neutron.json", import.meta.url);
 
-test("Calendar 0.6.7 exposes bounded owner, export, import, search, reminder, and scheduling APIs", async () => {
+test("Calendar 0.6.8 exposes bounded owner, export, import, search, reminder, and scheduling APIs", async () => {
   const manifest = JSON.parse(await readFile(manifestUrl, "utf8")) as NeutronManifest;
   expect(validate_neutron_conf(manifest).valid).toBe(true);
   expect(manifest).toMatchObject({
     id: "calendar",
     name: "Calendar",
-    version: 607,
+    version: 608,
     update_source: "233tv-xiaaa-aaaay-aacta-cai",
     func: {
       calendar_status: { type: "query", async: false },
@@ -44,6 +44,7 @@ test("Calendar 0.6.7 exposes bounded owner, export, import, search, reminder, an
   expect(manifest).not.toHaveProperty("capabilities.certified_assets");
   expect(manifest.memory).not.toHaveProperty("calendar_exports");
   expect(manifest).not.toHaveProperty("init_arg");
+  expect(manifest.capabilities?.preapproved_self_calls?.methods).toContain("calendar_status");
   expect(manifest).toMatchObject({ background: { path: "service.html" }, tray: { path: "tray.html", title: "Calendar" } });
   const exported = Object.entries(manifest.func).filter(([, value]) => value.type === "internal").map(([name]) => name).sort();
   expect(exported).toEqual(["calendar_availability_v1", "calendar_confirm_v1", "calendar_release_v1", "calendar_reserve_v1"]);
@@ -113,6 +114,6 @@ test("Calendar bundles only MIT FullCalendar standard views and fits the portal 
   expect(Object.keys(packageJson.dependencies).some((name) => name.includes("resource") || name.includes("premium"))).toBe(false);
   const notice = await readFile(new URL("../dist/web/THIRD_PARTY_NOTICES.txt", import.meta.url), "utf8");
   expect(notice).toContain("SPDX-License-Identifier: MIT");
-  const archive = await stat(new URL("../calendar.v0.6.7.neutron", import.meta.url));
+  const archive = await stat(new URL("../calendar.v0.6.8.neutron", import.meta.url));
   expect(archive.size).toBeLessThanOrEqual(1_900_000);
 });
