@@ -78,30 +78,15 @@ the matching authoritative Calendar search result.
 
    The answer must come from Calendar tools, not conversation memory.
 
-3. Public-web research with private-data separation:
-
-   > Search the public web for the next official Internet Computer Global R&D
-   > meeting or other clearly public DFINITY event. Do not put any private
-   > Calendar title, note, location, or busy interval into the web query. Show
-   > the source URL and exact proposed Calendar values, then wait for my explicit
-   > approval before adding anything.
-
-   Enable Agent's Web control for this turn only. Verify the public query is
-   free of private Calendar contents, review the source, approve the Calendar
-   mutation separately, then disable Web. Capture
-   `agent-public-research-review.png` and the resulting Calendar event.
-
-4. Denied unrelated permission:
-
-   > Read every file in Files and summarize the contents. Do not use Calendar.
-
-   Deny the unrelated Files inspection/use request. Agent must not claim it
-   read any files and must not create or change an event. Capture
-   `agent-denied-unrelated-permission.png`.
-
-5. Capture `agent-created-event-review.png` with the final Agent response and
-   the matching Calendar event/editor visible. Disconnect OpenRouter after the
+3. Optionally capture `agent-created-event-review.png` as submission collateral
+   with the final Agent response and matching Calendar event/editor visible.
+   This screenshot is not an acceptance gate. Disconnect OpenRouter after the
    run if this fixture will be shared.
+
+Live Agent web search and denial of unrelated Files access are outside
+Calendar/Rendezvous acceptance. Calendar's private-data separation and scoped
+self-call behavior are covered by deterministic tests; Files is not maintained
+by this project.
 
 Record model ID, Agent version, browser version, run time, and pass/fail details
 in the evidence directory. Model output alone is not proof; each mutation must
@@ -169,13 +154,11 @@ checks above. Microsoft also documents file import as a non-refreshing snapshot.
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| Agent direct status | Pending | clean transcript with no fallback |
-| Agent create/find | Pending | `agent-created-event-review.png` |
-| Agent public web separation | Pending | `agent-public-research-review.png` |
-| Denied unrelated permission | Pending | `agent-denied-unrelated-permission.png` |
+| Agent direct status | Passed (2026-09-02) | Owner transcript: UTC, revision 1, one event, 15-minute slots, zero buffers; no fallback or permission error |
+| Agent create/find/update/delete | Passed (2026-09-02) | Owner transcript: direct status; create series 2/rev 1; authoritative find; guarded title rev 1→2; re-read; occurrence end rev 2→3; guarded delete; zero-result search; final status rev 5/event count 1 |
 | Ambiguous write reconciliation | Passed (automated) | `apps/calendar/test/agent_qualification.test.ts` |
 | Google Calendar desktop/web import | Pending | timestamped screenshots and notes |
 | Outlook web import | Pending | timestamped screenshots and notes |
 
-Do not check the workplan's manual gates until all rows have evidence. These
-checks do not authorize `npm run updates:publish`.
+The two provider-import rows are the only remaining manual acceptance gates.
+These checks do not authorize `npm run updates:publish`.

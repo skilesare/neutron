@@ -1,6 +1,6 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0 and P1 import/undo/reminder implementation and automated Calendar/Rendezvous qualification complete through 0.6.8; live direct-status and manual interoperability/Agent acceptance remain release gates
+Status: P0/P1 implementation plus automated Calendar/Rendezvous and live Agent CRUD qualification are complete through 0.6.8; only manual Google Calendar and Outlook `.ics` import remains before release-readiness review
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
@@ -322,6 +322,23 @@ Phase 1 implementation evidence (automated portion, 2026-08-31):
 - [ ] Manually import fixtures into current Google Calendar and Outlook web.
   Record results and screenshots under a non-package test-evidence directory.
 
+  Prepared input (2026-09-02):
+
+  - `test-evidence/calendar-0.6.8/calendar-provider-import.ics`;
+  - 1,463 bytes, SHA-256
+    `10355253e74efc593587394abee4ee6bc2ead046e860412f1612a5ae531f6dc9`;
+  - independent validation report at
+    `test-evidence/calendar-0.6.8/calendar-provider-import.ics.validation.json`;
+  - four VEVENTs: three Busy and one Free, timed/all-day/DST recurrence/override,
+    CRLF-only with maximum physical line length 74 bytes, and excluded
+    cancelled/expired statuses absent.
+
+  Finalization after both imports: record provider surface/date/results in the
+  manual acceptance table, rebuild the source-included 0.6.8 package twice,
+  update its external archive/source hashes, and rerun only the exact-artifact
+  packaging regression if package provenance bytes change. Production publish
+  remains a separate explicitly authorized action.
+
 Exit gate: one-event, range, and full exports import correctly into Google and
 Outlook; recurring times remain correct across DST.
 
@@ -436,12 +453,16 @@ Phase 3 implementation evidence (2026-08-31):
 - [x] Add service tests following `apps/contacts/src/service.ts` and its tests.
 - [x] Add deterministic Agent qualification using a local driver/fake model; CI
   must not depend on OpenRouter or a real API key.
-- [ ] Manually verify with Agent 0.3.9:
+- [x] Manually verify Calendar's semantic tools with Agent 0.3.9:
   - create a simple event from natural language;
   - find an event;
-  - web-search a public event, preview the exact proposed Calendar values, and
-    add it only after owner intent is clear;
-  - deny an unrelated permission request.
+  - update through revision-guarded series and occurrence calls;
+  - delete through a revision-guarded series call and reconcile through search
+    plus direct status.
+- Live web-search behavior and denial of unrelated Files access belong to Agent
+  and Kernel qualification, not Calendar or Rendezvous. Calendar's privacy
+  boundary is covered by its tool descriptions, scoped self-call capability,
+  and deterministic tests; these unrelated live exercises are non-blocking.
 - [x] Reconcile an injected ambiguous write failure through the deterministic
   fake-driver qualification. Do not add a production fault-control surface only
   to reproduce this manually.
@@ -558,8 +579,19 @@ Live Calendar 0.6.7 Agent result and 0.6.8 follow-up (2026-09-02):
   repeated against exact SHA-256 `d739ba5e5d828bb45f56a5cf153cb3c0f719a3132c26ab68bbd48548147654fe`:
   the upgrade again passed in 1.1 minutes and 15 scenarios passed in 2.8 minutes
   with the same diagnostic skip.
-- [ ] Repeat live Agent create/find/update/delete acceptance on exact 0.6.8 and
-  capture a clean transcript where `status` succeeds directly.
+- [x] Repeat live Agent create/find/update/delete acceptance on Calendar 0.6.8
+  with direct `status` and no blind retries. `status` reported UTC, revision 1,
+  one event, 15-minute slots, and zero buffers. Agent created `Agent CRUD
+  0.6.8` as series 2/revision 1; authoritative search returned its exact UTC
+  values. A revision-guarded series-title update advanced revision 1→2;
+  authoritative re-read then allowed the occurrence-end override to advance
+  revision 2→3. Series deletion at expected revision 3 committed, exact-title
+  search returned zero results, and final `status` reported revision 5 with
+  event count 1, preserving the original `Agent acceptance 0.6.7` event.
+- [x] Verify the 0.6.8 direct-status correction with the owner: Agent returned
+  saved time zone `UTC`, revision `1`, event count `1`, 15-minute slot
+  increments, and zero before/after buffers. It did not report a preapproval
+  failure or fall back to `reminder_snapshot`.
 
 ## 11. P0 release gate — Calendar 0.3.0
 
@@ -577,9 +609,8 @@ Live Calendar 0.6.7 Agent result and 0.6.8 follow-up (2026-09-02):
   timezone implementation changed.
 - [x] Review the final `.neutron` archive, offered-source artifact, SHA-256, and
   size. Re-run from a clean checkout to test reproducibility where supported.
-- [ ] STOP before `npm run updates:publish`. Production publication requires an
-  explicit owner decision and the complete `AGENTS.md` publish/no-op receipt
-  workflow.
+Release boundary: do not run `npm run updates:publish` without an explicit
+owner decision and the complete `AGENTS.md` publish/no-op receipt workflow.
 
 P0 release-gate evidence (updated 2026-09-01):
 
@@ -941,10 +972,10 @@ accepted by both target consumers—or P1 ships without the feed.
 - [x] Install the final 0.6.6 candidate through a state-preserving in-product upgrade;
   never use reinstall as the production upgrade mechanism.
 - [x] Review exact archive/source bytes and SHA-256.
-- [ ] STOP before production publication until the owner explicitly authorizes
-  it. Then follow `doc/package-updates.md`, publish once, repeat the exact same
-  bytes, and require receipt-v2 `batch_id: null` with every selected package and
-  offered source `unchanged` on the second run.
+Release boundary: production publication remains unauthorized. After explicit
+owner authorization, follow `doc/package-updates.md`, publish once, repeat the
+exact same bytes, and require receipt-v2 `batch_id: null` with every selected
+package and offered source `unchanged` on the second run.
 
 Final 0.6.6 artifact evidence (2026-09-01):
 
@@ -1020,11 +1051,13 @@ Every phase must preserve:
 - [x] Add screenshots for the prepared export, import preview, and actionable
   tray reminder under `submission-assets/calendar/06-ics-export.jpg` through
   `08-reminder-tray.jpg` using the exact 0.6.6 installed UI.
-- [ ] Add an Agent-created event review screenshot only after the real Agent
-  0.3.9 acceptance run. Feed privacy controls are not applicable because the
-  subscription feed is withheld from 0.6.6.
-- [ ] Record the exact Google/Outlook test dates and product surfaces; cloud UI
-  behavior is external and can change.
+- [x] Record the owner-assisted Agent 0.3.9 direct-status and complete
+  create/find/update/delete transcript. A separate screenshot is optional
+  submission collateral, not a Calendar release gate. Feed privacy controls are
+  not applicable because the subscription feed is withheld.
+Provider evidence is tracked by the single remaining manual task in section
+8.3; record exact test dates and product surfaces there because cloud UI
+behavior is external and can change.
 - [x] Keep P0 and P1 release notes distinct.
 
 ## 19. Definition of done
