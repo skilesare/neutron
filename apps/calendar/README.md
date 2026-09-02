@@ -156,7 +156,7 @@ inside the documented grace window.
   enter the configured model context. Calendar never sends raw `.ics` export
   bytes to that context, and its tool contract prohibits putting private event
   text into public web-search queries.
-- Calendar 0.6.6 exposes no public subscription feed, bearer URL, or certified
+- Calendar 0.6.7 exposes no public subscription feed, bearer URL, or certified
   Calendar object.
 
 See [INTEROPERABILITY.md](INTEROPERABILITY.md) for Google and Outlook file
@@ -178,4 +178,4 @@ npm --workspace neutron-calendar test
 
 The package pipeline validates, builds, locks managed memory, creates method
 schemas, runs recurrence/domain/migration suites, and produces
-`apps/calendar/calendar.v0.6.6.neutron`.
+`apps/calendar/calendar.v0.6.7.neutron`.

@@ -7,7 +7,7 @@ import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
 const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "calendar-upgrade-local.ndeploy.json";
-const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.6.neutron");
+const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.7.neutron");
 
 test("resident reminder survives reload, drives the badge and tray, and opens the exact event", async ({ browser }) => {
   test.setTimeout(180_000);
@@ -26,7 +26,7 @@ test("resident reminder survives reload, drives the badge and tray, and opens th
     await actor.kernel_authorized_recover(Principal.fromText(principal));
     await page.reload({ waitUntil: "domcontentloaded" });
     const installed = (await actor.kernel_runtime_info()).apps.find((app) => app.scope.app_id === "calendar");
-    if (Number(installed?.version) < 606) { await uploadCandidate(page); await page.reload({ waitUntil: "domcontentloaded" }); }
+    if (Number(installed?.version) < 607) { await uploadCandidate(page); await page.reload({ waitUntil: "domcontentloaded" }); }
 
     let calendar = await openCalendar(page);
     const start = new Date(Date.now() + 2 * 60_000); const end = new Date(Date.now() + 32 * 60_000);
