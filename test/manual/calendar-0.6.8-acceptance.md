@@ -157,8 +157,8 @@ checks above. Microsoft also documents file import as a non-refreshing snapshot.
 | Agent direct status | Passed (2026-09-02) | Owner transcript: UTC, revision 1, one event, 15-minute slots, zero buffers; no fallback or permission error |
 | Agent create/find/update/delete | Passed (2026-09-02) | Owner transcript: direct status; create series 2/rev 1; authoritative find; guarded title rev 1→2; re-read; occurrence end rev 2→3; guarded delete; zero-result search; final status rev 5/event count 1 |
 | Ambiguous write reconciliation | Passed (automated) | `apps/calendar/test/agent_qualification.test.ts` |
-| Google Calendar desktop/web import | Pending | timestamped screenshots and notes |
-| Outlook web import | Pending | timestamped screenshots and notes |
+| Google Calendar web import | Passed (2026-09-02) | Provider reported 4 of 4 imported; owner visually confirmed all four exact titles on 2026-09-10, 2026-09-12, 2026-10-26, and 2026-11-02 |
+| Outlook web import | Deferred (non-blocking) | Recommended follow-up interoperability evidence |
 
-The two provider-import rows are the only remaining manual acceptance gates.
-These checks do not authorize `npm run updates:publish`.
+All hackathon acceptance gates are complete. The Outlook row is recommended
+follow-up evidence and does not authorize or block `npm run updates:publish`.

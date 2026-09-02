@@ -5,11 +5,11 @@ import {readFile, stat} from "node:fs/promises";
 import {resolve} from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const tag = "calendar-v0.2.0";
+const tag = "calendar-v0.6.8";
 const target = "calendar-hackathon";
 const publish = process.argv.includes("--publish");
 const files = [
-  "apps/calendar/calendar.v0.2.0.neutron",
+  "apps/calendar/calendar.v0.6.8.neutron",
   "submission-assets/calendar-demo.mp4",
 ];
 
@@ -39,7 +39,7 @@ const result = spawnSync("gh", [
   ...files,
   "--repo", "skilesare/neutron",
   "--target", target,
-  "--title", "Calendar 0.2.0 — Neutron hackathon candidate",
+  "--title", "Calendar 0.6.8 — Neutron hackathon candidate",
   "--notes-file", "submission/RELEASE_NOTES.md",
 ], {cwd: root, stdio: "inherit"});
 if (result.status !== 0) process.exit(result.status ?? 1);

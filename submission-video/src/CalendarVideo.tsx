@@ -145,7 +145,7 @@ const ClosingScene: React.FC<{duration: number}> = ({duration}) => (
       <Eyebrow>Built for Neutron</Eyebrow>
       <Headline>A full-featured calendar.<br />One install. Your data.</Headline>
       <div style={{display: "flex", gap: 18, marginTop: 18}}>
-        {["Standalone", "Recurring events", "Busy / free", "Local-first"].map((item) => <div key={item} style={{padding: "16px 24px", border: "1px solid #385749", borderRadius: 999, fontSize: 24, color: colors.muted}}>{item}</div>)}
+        {["Standalone", "ICS import / export", "Reminders", "Agent tools"].map((item) => <div key={item} style={{padding: "16px 24px", border: "1px solid #385749", borderRadius: 999, fontSize: 24, color: colors.muted}}>{item}</div>)}
       </div>
       <div style={{fontSize: 42, color: colors.mint, fontWeight: 850, marginTop: 24}}>Calendar</div>
     </AbsoluteFill>
@@ -154,12 +154,14 @@ const ClosingScene: React.FC<{duration: number}> = ({duration}) => (
 
 export const CalendarVideo: React.FC = () => (
   <AbsoluteFill style={{background: `radial-gradient(circle at 50% 18%, #173426 0, ${colors.bg} 60%)`, color: colors.ink, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"}}>
-    <Sequence from={0} durationInFrames={150}><TitleScene duration={150} /></Sequence>
-    <Sequence from={150} durationInFrames={270}><ViewsScene duration={270} /></Sequence>
-    <Sequence from={420} durationInFrames={270}><SplitScene duration={270} eyebrow="Real recurrence" title={<>Repeat precisely.<br />Change safely.</>} copy="Create weekly series, choose exact weekdays, set occurrence limits, and edit one event or the entire series." image="02-recurring-series.jpg" flip /></Sequence>
-    <Sequence from={690} durationInFrames={250}><SplitScene duration={250} eyebrow="Details that matter" title="Everything needed to plan." copy="Keep location, notes, color, busy/free status, and timezone-resolved start and end times together." image="04-event-details.jpg" /></Sequence>
-    <Sequence from={940} durationInFrames={270}><PrivacyScene duration={270} /></Sequence>
-    <Sequence from={1210} durationInFrames={280}><ResponsiveScene duration={280} /></Sequence>
-    <Sequence from={1490} durationInFrames={310}><ClosingScene duration={310} /></Sequence>
+    <Sequence from={0} durationInFrames={120}><TitleScene duration={120} /></Sequence>
+    <Sequence from={120} durationInFrames={220}><ViewsScene duration={220} /></Sequence>
+    <Sequence from={340} durationInFrames={210}><SplitScene duration={210} eyebrow="Real recurrence" title={<>Repeat precisely.<br />Change safely.</>} copy="Create weekly series, choose exact weekdays, set occurrence limits, and edit one event or the entire series." image="02-recurring-series.jpg" flip /></Sequence>
+    <Sequence from={550} durationInFrames={180}><SplitScene duration={180} eyebrow="Details that matter" title="Everything needed to plan." copy="Keep location, notes, color, busy/free status, and timezone-resolved start and end times together." image="04-event-details.jpg" /></Sequence>
+    <Sequence from={730} durationInFrames={230}><SplitScene duration={230} eyebrow="Open calendar format" title={<>Bring schedules in.<br />Take them anywhere.</>} copy="Preview bounded iCalendar files before an atomic import, undo safely, and export standards-compliant .ics snapshots for Google Calendar or Outlook." image="07-ics-import-preview.jpg" flip /></Sequence>
+    <Sequence from={960} durationInFrames={210}><SplitScene duration={210} eyebrow="Resident reminders" title="Your next event stays close." copy="Set event reminders, see an actionable badge, and jump from the tray to the exact Calendar occurrence." image="08-reminder-tray.jpg" /></Sequence>
+    <Sequence from={1170} durationInFrames={190}><PrivacyScene duration={190} /></Sequence>
+    <Sequence from={1360} durationInFrames={220}><ResponsiveScene duration={220} /></Sequence>
+    <Sequence from={1580} durationInFrames={220}><ClosingScene duration={220} /></Sequence>
   </AbsoluteFill>
 );

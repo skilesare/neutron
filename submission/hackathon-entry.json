@@ -1,16 +1,17 @@
 {
   "title": "Calendar",
   "slug": "calendar",
-  "summary": "A full-featured, private-by-default calendar that runs inside a personal Neutron. Calendar supports month, week, day, and agenda views; drag and resize; recurring series and exceptions; all-day events; busy/free state; colors, notes, locations, timezone-aware editing, responsive layouts, and bounded availability queries without exposing private event details.",
+  "summary": "A full-featured, private-by-default calendar for a personal Neutron. Plan in month, week, day, or agenda views; drag and resize; manage recurring series and exceptions; import and export standard iCalendar files; receive resident reminders; and use semantic Agent tools. Other Neutron apps can query bounded availability without receiving private event details.",
   "sourceUrl": "https://github.com/skilesare/neutron/tree/calendar-hackathon",
-  "demoUrl": "https://github.com/skilesare/neutron/releases/download/calendar-v0.2.0/calendar-demo.mp4",
+  "demoUrl": "https://github.com/skilesare/neutron/releases/download/calendar-v0.6.8/calendar-demo.mp4",
   "icon": "apps/calendar/public/static/icon.png",
-  "package": "apps/calendar/calendar.v0.2.0.neutron",
+  "package": "apps/calendar/calendar.v0.6.8.neutron",
   "screenshots": [
     "submission-assets/calendar/01-week-calendar.jpg",
     "submission-assets/calendar/02-recurring-series.jpg",
-    "submission-assets/calendar/03-month-calendar.jpg",
-    "submission-assets/calendar/04-event-details.jpg",
-    "submission-assets/calendar/05-mobile-agenda.jpg"
+    "submission-assets/calendar/05-mobile-agenda.jpg",
+    "submission-assets/calendar/06-ics-export.jpg",
+    "submission-assets/calendar/07-ics-import-preview.jpg",
+    "submission-assets/calendar/08-reminder-tray.jpg"
   ]
 }

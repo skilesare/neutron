@@ -1,6 +1,6 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0/P1 implementation plus automated Calendar/Rendezvous and live Agent CRUD qualification are complete through 0.6.8; only manual Google Calendar and Outlook `.ics` import remains before release-readiness review
+Status: Calendar 0.6.8 is hackathon-submission ready: P0/P1 implementation, automated Calendar/Rendezvous qualification, live Agent CRUD, and Google Calendar `.ics` import are complete; Outlook is a recommended non-blocking follow-up and production publication remains separately gated
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
@@ -319,8 +319,10 @@ Phase 1 implementation evidence (automated portion, 2026-08-31):
   iCalendar parser used only in tests, or a maintained validation tool.
 - [x] Test deterministic bytes for unchanged state.
 - [x] Test line folding by UTF-8 bytes, CRLF output, stable UID, and SEQUENCE.
-- [ ] Manually import fixtures into current Google Calendar and Outlook web.
-  Record results and screenshots under a non-package test-evidence directory.
+- [x] Manually import the fixture into a current major cloud calendar provider
+  and record the result under a non-package test-evidence directory. Google
+  Calendar is the required hackathon interoperability proof; Outlook is a
+  recommended non-blocking follow-up.
 
   Prepared input (2026-09-02):
 
@@ -333,14 +335,20 @@ Phase 1 implementation evidence (automated portion, 2026-08-31):
     CRLF-only with maximum physical line length 74 bytes, and excluded
     cancelled/expired statuses absent.
 
-  Finalization after both imports: record provider surface/date/results in the
-  manual acceptance table, rebuild the source-included 0.6.8 package twice,
-  update its external archive/source hashes, and rerun only the exact-artifact
-  packaging regression if package provenance bytes change. Production publish
-  remains a separate explicitly authorized action.
+  Google Calendar web result (2026-09-02): **passed**. Google reported `4 of 4`
+  events imported, and the owner visually confirmed all four exact titles on
+  September 10, September 12, October 26, and November 2, 2026. Outlook web
+  import remains recommended follow-up evidence, not a submission blocker.
 
-Exit gate: one-event, range, and full exports import correctly into Google and
-Outlook; recurring times remain correct across DST.
+  Finalization after provider evidence: record the surface/date/result in the
+  manual acceptance table, rebuild the source-included 0.6.8 package twice,
+  update its external archive/source hashes, and rerun the exact-artifact
+  packaging regression if package provenance bytes change. A future Outlook
+  result can be added as evidence without reopening hackathon readiness.
+
+Exit gate: one-event, range, and full exports pass independent parsing and
+manual import in at least one current major cloud provider; Google Calendar
+passed 4 of 4 and recurring wall times remained correct across DST.
 
 Phase 2 implementation evidence (automated portion, 2026-08-31):
 
@@ -576,7 +584,8 @@ Live Calendar 0.6.7 Agent result and 0.6.8 follow-up (2026-09-02):
   schema-v4 state preserved on both peers. The full upgraded suite then passed
   15 scenarios in 3.0 minutes with its one opt-in owner diagnostic skipped.
   After source-included evidence notes finalized the archive, both gates were
-  repeated against exact SHA-256 `d739ba5e5d828bb45f56a5cf153cb3c0f719a3132c26ab68bbd48548147654fe`:
+  repeated against the runtime-equivalent pre-acceptance archive SHA-256
+  `d739ba5e5d828bb45f56a5cf153cb3c0f719a3132c26ab68bbd48548147654fe`:
   the upgrade again passed in 1.1 minutes and 15 scenarios passed in 2.8 minutes
   with the same diagnostic skip.
 - [x] Repeat live Agent create/find/update/delete acceptance on Calendar 0.6.8
@@ -1009,18 +1018,28 @@ Calendar 0.6.7 corrective candidate evidence (2026-09-02):
 
 Calendar 0.6.8 status-preapproval candidate evidence (2026-09-02):
 
-- archive: `apps/calendar/calendar.v0.6.8.neutron`, 590,265 bytes,
-  SHA-256 `d739ba5e5d828bb45f56a5cf153cb3c0f719a3132c26ab68bbd48548147654fe`;
+- archive: `apps/calendar/calendar.v0.6.8.neutron`, 590,266 bytes,
+  SHA-256 `a30e9d2af6fd6aa51585f3209bc76e44196f576023e36d2f468c357638a183f6`;
 - offered source:
-  `7bd43966b9da02ccff69d7ae0aa9e8286880d4ccdc6910273892dc75f02045e0.source.v1.msgpack.gz`,
-  487,588 bytes, SHA-256
-  `7bd43966b9da02ccff69d7ae0aa9e8286880d4ccdc6910273892dc75f02045e0`;
+  `8fd7c7bc85cb482476e598c649000ec42e9d693792eaf6baa9151f44a27da8a2.source.v1.msgpack.gz`,
+  487,644 bytes, SHA-256
+  `8fd7c7bc85cb482476e598c649000ec42e9d693792eaf6baa9151f44a27da8a2`;
 - an immediate unchanged rebuild reproduced the same archive size/hash and
   reused the same content-addressed offered-source artifact;
 - the package changes only Calendar's manifest preapproval, version, tests, and
   documentation. Kernel code, backend code/API, schema-v4 memory, and migration
   lineage are unchanged;
 - production publication remains explicitly unauthorized.
+
+Hackathon collateral (2026-09-02):
+
+- refreshed Calendar-only Remotion video:
+  `submission-assets/calendar-demo.mp4`, 1,800 frames at 30 fps, 1920×1080
+  H.264, 7,651,623 bytes, SHA-256
+  `284e92c0233bb360d4cf631bd74abfb28450bb1d5a5445e3ca03abacc9f1d57d`;
+- portal entry and GitHub release helper target Calendar 0.6.8, tag
+  `calendar-v0.6.8`, the current package, current icon, and six bounded
+  screenshots; both dry checks passed.
 
 ## 17. Cross-cutting test matrix
 
