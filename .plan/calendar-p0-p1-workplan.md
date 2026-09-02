@@ -1,12 +1,12 @@
 # Calendar P0/P1 implementation workplan
 
-Status: P0 and P1 import/undo/reminder implementation and automated Calendar qualification complete through 0.6.6; the subscription-feed decision and manual interoperability/Agent acceptance remain release gates
+Status: P0 and P1 import/undo/reminder implementation and automated Calendar qualification complete through 0.6.6; Calendar 0.6.7 Agent-interoperability fixes are in progress after live acceptance exposed two app-side defects; manual interoperability/Agent acceptance remain release gates
 Created: 2026-08-31
 App branch: `calendar-hackathon`
 Current production Calendar release: 0.2.0 (`version` `200`)
 Unpublished P0 candidate: Calendar 0.3.0 (`version` `300`)
 Unpublished import candidate: Calendar 0.5.0 (`version` `500`), `calendar` schema v4
-Unpublished reminder candidate: Calendar 0.6.6 (`version` `606`), `calendar` schema remains v4
+Unpublished Agent-interoperability candidate: Calendar 0.6.7 (`version` `607`), `calendar` schema remains v4
 Current production Calendar memory: `calendar` schema v2
 Current working Kernel baseline: 0.3.22
 Upstream synchronized for implementation: `infu/neutron` `ccf8595`
@@ -469,6 +469,45 @@ Phase 4 implementation evidence (automated portion, 2026-08-31):
   Files 403; Calendar memory is schema v4; both resident endpoints reached
   `ready`; Agent exposed its visible **Connect to OpenRouter** flow; and Calendar
   remained resident. Credentialed prompts and screenshots remain owner-assisted.
+
+Live Agent acceptance finding and 0.6.7 corrective work (2026-09-02):
+
+- [x] Connect owner seed `100000` to OpenRouter with Agent Mode and a free,
+  tool-capable model. The first free-router attempt was externally rate-limited;
+  switching models allowed the semantic Calendar flow to execute.
+- [x] Preserve the observed state after the failed run: Calendar 0.6.6 committed
+  two identical owner events for `2026-09-03T14:00:00Z`–`14:30:00Z`. Do not
+  delete either through automation until identity, IDs, and revisions are
+  authoritatively re-read; owner may delete the duplicate in the tile.
+- [x] Diagnose the first defect: `create_event` accepted only `{ ok: value }`
+  mutation replies although the live self-call returned the successful value
+  directly. The first event therefore committed but was falsely reported as
+  `create event result returned invalid data`; the model then violated the
+  non-retry instruction and dispatched a second create.
+- [x] Diagnose the cleanup defect: the model/provider emitted small `seriesId`
+  and `expectedRevision` values as JSON integers while Calendar 0.6.6 required
+  decimal strings at schema validation, so `delete_event` never dispatched.
+- [x] In Calendar 0.6.7, accept wrapped or directly unwrapped successful
+  mutation results. Accept safe nonnegative JSON integers on identifier/revision
+  inputs and normalize them to strings before any canister call; continue to
+  return only strings and reject unsafe numeric values to preserve Nat64
+  precision. This changes neither Kernel nor persistent memory.
+- [x] Add focused regression tests for direct create success, exactly one create
+  dispatch, safe-integer delete validation/normalization, unsafe-number
+  rejection, and lossless maximum-Nat64 decimal strings. The focused service
+  and deterministic Agent suites pass 14 tests / 72 expectations.
+- [x] Run the complete Calendar 0.6.7 package, release, memory, domain, and
+  migration suites: 69 Bun tests plus all Motoko programs passed in 19.4 seconds.
+  The focused state-preserving 0.2.0→0.6.7 browser upgrade passed in 33.3 seconds,
+  and reminder/tray acceptance passed in 12.4 seconds.
+- [ ] Run the Calendar/Rendezvous two-Neutron cross-app upgrade and full
+  Rendezvous regression suites against the exact 0.6.7 candidate.
+- [ ] Install the exact tested 0.6.7 package into the owner-assisted fixture by
+  the normal state-preserving in-product update path, verify both duplicate
+  events survived the upgrade, delete only series 2 after authoritative re-read,
+  and repeat create/find/update/delete acceptance without blind retries.
+- [ ] Capture the successful Agent review and authoritative Calendar result;
+  the 0.6.6 transcript is retained as failure evidence, not a passing artifact.
 
 ## 11. P0 release gate — Calendar 0.3.0
 

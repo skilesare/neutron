@@ -2,7 +2,7 @@
   "format": 3,
   "name": "Calendar",
   "id": "calendar",
-  "version": 606,
+  "version": 607,
   "update_source": "233tv-xiaaa-aaaay-aacta-cai",
   "description": "Private calendar and local availability for installed Neutron apps",
   "src": "main.mo",

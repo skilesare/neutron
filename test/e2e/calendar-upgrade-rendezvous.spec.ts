@@ -9,9 +9,9 @@ import { resolveLocalNeutronRuntime } from "../../packages/neutron-provision/src
 import { signInWithLocalInternetIdentity } from "./local-ii.ts";
 
 const configPath = process.env.NEUTRON_NDEPLOY_CONFIG ?? "rendezvous-calendar-upgrade-local.ndeploy.json";
-const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.6.neutron");
+const candidateArchive = resolve(process.env.CALENDAR_UPGRADE_ARCHIVE ?? "apps/calendar/calendar.v0.6.7.neutron");
 
-test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.6.6", async ({ browser }) => {
+test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 to 0.6.7", async ({ browser }) => {
   test.setTimeout(360_000);
   const aliceRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 0 });
   const bobRuntime = resolveLocalNeutronRuntime({ configPath, nodeIndex: 1 });
@@ -53,7 +53,7 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     await bob.page.reload({ waitUntil: "domcontentloaded" });
     const afterRuntime = await actor.kernel_runtime_info();
     const afterApp = afterRuntime.apps.find((app) => app.scope.app_id === "calendar");
-    expect(Number(afterApp?.version)).toBe(606);
+    expect(Number(afterApp?.version)).toBe(607);
     const afterCalendarMemory = afterRuntime.memories.find((memory) => memory.id === "calendar");
     expect(Number(afterCalendarMemory?.version)).toBe(4);
     expect(String(afterApp?.scope.installation_uid)).toBe(String(beforeApp?.scope.installation_uid));
@@ -75,7 +75,7 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     await expect(upgraded.getByRole("button", { name: "Open meeting in Rendezvous" })).toBeVisible();
 
     // Bring Alice through the same state-preserving update so the shared fixture
-    // is left with Calendar 0.6.6 on both sides for the full Rendezvous suite.
+    // is left with Calendar 0.6.7 on both sides for the full Rendezvous suite.
     await setCanisterRunning(aliceRuntime, true); aliceStopped = false;
     const aliceActor = await developerActor(aliceRuntime);
     const aliceBeforeRuntime = await aliceActor.kernel_runtime_info();
@@ -85,7 +85,7 @@ test("confirmed and live-hold Rendezvous calendar state survives Calendar 0.2.0 
     await alice.page.reload({ waitUntil: "domcontentloaded" });
     const aliceAfterRuntime = await aliceActor.kernel_runtime_info();
     const aliceAfterApp = aliceAfterRuntime.apps.find((app) => app.scope.app_id === "calendar");
-    expect(Number(aliceAfterApp?.version)).toBe(606);
+    expect(Number(aliceAfterApp?.version)).toBe(607);
     const aliceBeforeCalendarMemory = aliceBeforeRuntime.memories.find((memory) => memory.id === "calendar");
     const aliceAfterCalendarMemory = aliceAfterRuntime.memories.find((memory) => memory.id === "calendar");
     expect(Number(aliceAfterCalendarMemory?.version)).toBe(4);

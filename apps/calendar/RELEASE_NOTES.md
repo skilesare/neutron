@@ -1,5 +1,26 @@
 # Calendar release notes
 
+## 0.6.7 — unpublished candidate
+
+- Accepts model-emitted safe JSON integers for Calendar identifiers and
+  revisions, normalizing them to lossless decimal strings before canister
+  calls. Full-width Nat64 inputs and every identifier in tool results remain
+  decimal strings.
+- Accepts both wrapped and directly unwrapped successful self-call mutation
+  responses, matching the Calendar UI and preventing a committed event from
+  being falsely reported as invalid.
+- Adds regressions for the exact live Agent failure: one successful create is
+  reported as committed, safe numeric IDs can delete a duplicate, unsafe
+  numeric IDs are rejected, and decimal-string IDs retain full precision.
+- Retains the locked schema-v4 memory lineage and all 0.6.6 Calendar behavior;
+  no backend schema, capability, or Kernel change is introduced.
+
+Calendar 0.6.7 was created after owner-assisted Agent acceptance exposed a
+provider/tool interoperability defect in 0.6.6. Its complete package/domain/
+migration suite and state-preserving 0.2.0 upgrade passed. It remains unpublished
+pending the two-Neutron Rendezvous regression, repeated live Agent acceptance,
+manual Google/Outlook import, and explicit publication authorization.
+
 ## 0.6.6 — unpublished candidate
 
 - Adds durable zero-or-one reminder offsets for a series or individual

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { listExposedTools, type JsonValue, type MsgBusToolContext } from "neutron-tools/app";
+import { listExposedTools, validateToolArguments, type JsonValue, type MsgBusToolContext } from "neutron-tools/app";
 import { calendarToolHandlers } from "../src/service";
 
 const tools = listExposedTools();
@@ -92,6 +92,15 @@ test("create_event performs one revision-guarded scoped mutation", async () => {
   expect(calls[1]?.args?.[0]).toMatchObject({ expected_revision: "9", value: { title: "Planning", time_zone: "America/Chicago" } });
 });
 
+test("create_event accepts the live directly unwrapped mutation result", async () => {
+  const { context, calls } = fakeContext((call) => call.method === "calendar_preferences_get"
+    ? { revision: "9", display_time_zone: "UTC", slot_increment_minutes: 15, buffer_before_minutes: 0, buffer_after_minutes: 0 }
+    : series);
+  const result = await calendarToolHandlers.create_event({ title: "Agent acceptance", start: "2026-09-03T14:00:00Z", end: "2026-09-03T14:30:00Z" }, context);
+  expect(result).toMatchObject({ committed: true, series: { id: "7", title: "Planning" } });
+  expect(calls.filter((call) => call.kind === "update")).toHaveLength(1);
+});
+
 test("series updates reject occurrence times before any authoritative call", async () => {
   const { context, calls } = fakeContext(() => { throw new Error("must not call"); });
   await expect(calendarToolHandlers.update_event({ scope: "series", seriesId: "7", expectedRevision: "3", start: "2026-09-01T09:00:00Z" }, context)).rejects.toThrow("start and end apply only");
@@ -102,4 +111,18 @@ test("delete_event dispatches the exact revision-guarded scoped mutation", async
   const { context, calls } = fakeContext(() => ({ ok: { revision: "10" } }));
   expect(await calendarToolHandlers.delete_event({ scope: "occurrence", seriesId: "7", occurrenceId: "11", expectedRevision: "2" }, context)).toMatchObject({ committed: true, revision: "10" });
   expect(calls).toEqual([{ kind: "update", method: "calendar_occurrence_remove_v2", args: [{ occurrence_id: "11", expected_occurrence_revision: "2" }] }]);
+});
+
+test("model-coerced safe integer ids validate and normalize before dispatch", async () => {
+  const descriptor = tools.find((tool) => tool.name === "delete_event")!;
+  validateToolArguments(descriptor, { scope: "series", seriesId: 2, expectedRevision: 1 });
+  const { context, calls } = fakeContext(() => ({ revision: "10" }));
+  expect(await calendarToolHandlers.delete_event({ scope: "series", seriesId: 2, expectedRevision: 1 }, context)).toMatchObject({ committed: true, revision: "10" });
+  expect(calls).toEqual([{ kind: "update", method: "calendar_series_remove_v2", args: [{ series_id: "2", expected_series_revision: "1" }] }]);
+});
+
+test("unsafe numeric ids are rejected while decimal strings remain lossless", () => {
+  const descriptor = tools.find((tool) => tool.name === "delete_event")!;
+  expect(() => validateToolArguments(descriptor, { scope: "series", seriesId: Number.MAX_SAFE_INTEGER + 1, expectedRevision: 1 })).toThrow();
+  validateToolArguments(descriptor, { scope: "series", seriesId: "18446744073709551615", expectedRevision: "1" });
 });
